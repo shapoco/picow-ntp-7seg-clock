@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.12)
 set(APP_NAME display_test)
 set(APP_INC_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(APP_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
-set(SUBMODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../../submodules)
+set(SUBMODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../submodules)
+
+set(VLCFG_DIR ${SUBMODULE_DIR}/vlconfig/cpp/lib)
 
 # Pull in PICO SDK (must be before project)
 set(PICO_SDK_PATH $ENV{PICO_SDK_PATH})
@@ -15,6 +17,7 @@ project(${APP_NAME} C CXX ASM)
 pico_sdk_init()
 
 add_executable(${APP_NAME})
+add_subdirectory(${VLCFG_DIR} vlcfg)
 
 target_compile_options(${APP_NAME} PUBLIC -O2 -Wall)
 
@@ -31,17 +34,17 @@ target_sources(${APP_NAME} PRIVATE
 
 target_include_directories(${APP_NAME} PRIVATE
     ${APP_INC_DIR}
+    ${VLCFG_DIR}/include
 )
 
 target_link_libraries(${APP_NAME} PRIVATE
     pico_stdlib
     pico_multicore
-    hardware_clocks
+    pico_cyw43_arch_lwip_poll
+    #pico_cyw43_arch_lwip_threadsafe_background
+    hardware_adc
     hardware_dma
-    hardware_spi
-    hardware_i2c
-    hardware_irq
-    hardware_pio
+    vlcfg
 )
 
 pico_enable_stdio_usb(${APP_NAME} 1)

@@ -45,12 +45,11 @@
                 "${PICO_SDK_PATH}/src/common/pico_binary_info/include",
                 "${workspaceFolder}/firmware/build/generated/pico_base",
                 "${workspaceFolder}/firmware/build/",
-                "${workspaceFolder}/firmware/include"
+                "${workspaceFolder}/firmware/include",
+                "${workspaceFolder}/submodules/vlconfig/cpp/lib/include"
             ],
             "defines": [
-                "BOARD_PICO",
-                "DGC9A01A",
-                "USE_PICO_SDK=1"
+                "NTP_CLIENT_IMPLEMENTATION"
             ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",

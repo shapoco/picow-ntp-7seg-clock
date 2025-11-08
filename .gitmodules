@@ -1,0 +1,3 @@
+[submodule "submodules/vlconfig"]
+	path = submodules/vlconfig
+	url = https://github.com/shapoco/vlconfig.git
