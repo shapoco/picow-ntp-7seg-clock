@@ -44,7 +44,7 @@ static constexpr uint64_t EPOCH = 2208988800;
 
 result_t get_time(const config::Data &cfg, uint64_t *out_time);
 
-#ifdef NTP_CLIENT_IMPLEMENTATION
+#ifdef NTPC_CLIENT_IMPLEMENTATION
 
 static result_t dns_solve(const char *host_name, ip_addr_t *addr);
 static void dns_found(const char *name, const ip_addr_t *addr, void *arg);
@@ -54,6 +54,7 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 
 result_t get_time(const config::Data &cfg, uint64_t *out_time) {
   if (!out_time) {
+    printf("NTP client: NULL pointer for output time\n");
     return result_t::NULL_POINTER;
   }
 
@@ -70,6 +71,7 @@ result_t get_time(const config::Data &cfg, uint64_t *out_time) {
   }
 
   if (cyw43_arch_init_with_country(country)) {
+    printf("NTP client: ARCH init failed\n");
     ret = result_t::ARCH_INIT_FAILED;
     goto init_failed;
   }
@@ -80,19 +82,26 @@ result_t get_time(const config::Data &cfg, uint64_t *out_time) {
 
   if (cyw43_arch_wifi_connect_timeout_ms(cfg.ssid, cfg.pass,
                                          CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+    printf("NTP client: WiFi connect failed\n");
     ret = result_t::WIFI_CONNECT_FAILED;
     goto init_failed;
   }
+  printf("NTP client: WiFi connected\n");
 
   ret = dns_solve(cfg.ntp_host, &addr);
   if (ret != result_t::SUCCESS) {
+    printf("NTP client: DNS resolution failed\n");
     goto dns_failed;
   }
+  printf("NTP client: Resolved NTP server %s to %s\n", cfg.ntp_host,
+         ipaddr_ntoa(&addr));
 
   ret = ntp_request(addr, out_time);
   if (ret != result_t::SUCCESS) {
+    printf("NTP client: NTP request failed\n");
     goto ntp_failed;
   }
+  printf("NTP client: NTP time received: %llu ms since epoch\n", *out_time);
 
 ntp_failed:
 dns_failed:
@@ -111,7 +120,7 @@ static result_t dns_solve(const char *host_name, ip_addr_t *addr) {
     return result_t::NULL_POINTER;
   }
 
-  int err = dns_gethostbyname(host_name, addr, dns_found, &ctx);
+  int err = dns_gethostbyname(host_name, &ctx.result, dns_found, &ctx);
   if (err == ERR_OK) {
     ctx.success = true;
   } else if (err == ERR_INPROGRESS) {
@@ -131,6 +140,10 @@ static result_t dns_solve(const char *host_name, ip_addr_t *addr) {
 
 static void dns_found(const char *name, const ip_addr_t *addr, void *arg) {
   DnsContext &ctx = *(DnsContext *)arg;
+
+  printf("NTP client: dns_found called: name=%s, addr=%s\n", name,
+         addr ? ipaddr_ntoa(addr) : "null");
+
   ctx.called_back = true;
   ctx.success = !!addr;
   if (addr) {
@@ -139,46 +152,68 @@ static void dns_found(const char *name, const ip_addr_t *addr, void *arg) {
 }
 
 static result_t ntp_request(const ip_addr_t addr, uint64_t *result) {
+  result_t ret = result_t::UNKNOWN_ERROR;
   NtpContext ctx;
+  udp_pcb *ntp_pcb = nullptr;
   ctx.called_back = false;
   ctx.success = false;
   ctx.result_ms = 0;
   ctx.addr = addr;
 
   if (!result) {
-    return result_t::NULL_POINTER;
+    ret = result_t::NULL_POINTER;
+    goto fatal;
   }
 
   //  udp_pcb *ntp_pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
-  udp_pcb *ntp_pcb = udp_new_ip_type(IPADDR_TYPE_V4);
+  ntp_pcb = udp_new_ip_type(IPADDR_TYPE_V4);
   if (!ntp_pcb) {
     return result_t::ARCH_INIT_FAILED;
   }
   udp_recv(ntp_pcb, ntp_recv, &ctx);
 
-  absolute_time_t start = get_absolute_time();
+  {
+    absolute_time_t start = get_absolute_time();
 
-  struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_REQ_SIZE, PBUF_RAM);
-  uint8_t *req = (uint8_t *)p->payload;
-  memset(req, 0, NTP_REQ_SIZE);
-  req[0] = 0x1b;
-  // req[0] = 0x23;
-  udp_sendto(ntp_pcb, p, &addr, PORT);
-  pbuf_free(p);
+    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_REQ_SIZE, PBUF_RAM);
+    if (!p) {
+      printf("NTP client: pbuf_alloc failed\n");
+      ret = result_t::NTP_FAILED;
+      goto fatal;
+    }
 
-  while (!ctx.called_back) {
-    cyw43_arch_poll();
+    uint8_t *req = (uint8_t *)p->payload;
+    memset(req, 0, NTP_REQ_SIZE);
+    req[0] = 0x1b;
+    // req[0] = 0x23;
+    err_t err = udp_sendto(ntp_pcb, p, &addr, PORT);
+    if (err != ERR_OK) {
+      printf("NTP client: udp_sendto failed: %d\n", err);
+      pbuf_free(p);
+      ret = result_t::NTP_FAILED;
+      goto send_failed;
+    }
+
+    pbuf_free(p);
+
+    while (!ctx.called_back) {
+      cyw43_arch_poll();
+    }
+
+    uint32_t elapsed_ms =
+        absolute_time_diff_us(start, get_absolute_time()) / 1000;
+    if (ctx.success) {
+      *result = ctx.result_ms + elapsed_ms / 2;
+      ret = result_t::SUCCESS;
+    } else {
+      ret = result_t::NTP_FAILED;
+    }
   }
 
-  uint32_t elapsed_ms =
-      absolute_time_diff_us(start, get_absolute_time()) / 1000;
-
-  if (ctx.success) {
-    *result = ctx.result_ms + elapsed_ms / 2;
-  }
-
+send_failed:
   udp_remove(ntp_pcb);
-  return ctx.success ? result_t::SUCCESS : result_t::NTP_FAILED;
+fatal:
+  return ret;
 }
 
 static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
@@ -186,6 +221,9 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
   NtpContext &ctx = *(NtpContext *)arg;
   uint8_t mode = pbuf_get_at(p, 0) & 0x7;
   uint8_t stratum = pbuf_get_at(p, 1);
+
+  printf("NTP client: ntp_recv called: port=%u, len=%u, mode=%u, stratum=%u\n",
+         port, p->tot_len, mode, stratum);
 
   ctx.called_back = true;
   ctx.success = false;

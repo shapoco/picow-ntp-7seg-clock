@@ -53,7 +53,7 @@ class Driver {
 
   result_t read_data(addr_t mem_addr, uint8_t* buffer, addr_t length) {
     if (mem_addr + length > size_bytes) {
-      printf("EEPROM read addr out of bounds: addr=0x%04X, length=%u\n",
+      printf("EEPROM read addr out of bounds: addr=0x%04lX, length=%lu\n",
              mem_addr, length);
       return result_t::ADDR_OUT_OF_BOUNDS;
     }
@@ -74,11 +74,11 @@ class Driver {
       return result_t::I2C_ACCESS_FAILED;
     }
 
-    printf("EEPROM read successful: addr=0x%04X, length=%u\n", mem_addr,
+    printf("EEPROM read successful: addr=0x%04lX, length=%lu\n", mem_addr,
            length);
     for (addr_t i = 0; i < length; i++) {
       if (i % 16 == 0) {
-        printf("\n0x%04X: ", mem_addr + i);
+        printf("\n0x%04lX: ", mem_addr + i);
       }
       printf("%02X ", buffer[i]);
     }
@@ -92,17 +92,17 @@ class Driver {
     uint8_t* write_buf = new uint8_t[page_bytes];
     addr_t offset_mask = page_bytes - 1;
 
-    printf("EEPROM write: addr=0x%04X, length=%u\n", mem_addr, length);
+    printf("EEPROM write: addr=0x%04lX, length=%lu\n", mem_addr, length);
     for (addr_t i = 0; i < length; i++) {
       if (i % 16 == 0) {
-        printf("\n0x%04X: ", mem_addr + i);
+        printf("\n0x%04lX: ", mem_addr + i);
       }
       printf("%02X ", data[i]);
     }
     printf("\n");
 
     if (mem_addr + length > size_bytes) {
-      printf("EEPROM write addr out of bounds: addr=0x%04X, length=%u\n",
+      printf("EEPROM write addr out of bounds: addr=0x%04lX, length=%lu\n",
              mem_addr, length);
       res = result_t::ADDR_OUT_OF_BOUNDS;
       goto failed;

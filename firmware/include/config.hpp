@@ -59,7 +59,7 @@ bool is_receiving();
 bool last_bit();
 vlcfg::Result last_vlcfg_error();
 
-#ifdef CONFIG_IMPLEMENTATION
+#ifdef NTPC_CONFIG_IMPLEMENTATION
 
 const char *KEY_COUNTRY = "c";
 const char *KEY_SSID = "s";
@@ -198,7 +198,7 @@ static bool eeprom_load_config(Data &cfg) {
         ((uint32_t)(buff[EEPROM_CONFIG_CRC_OFFSET + 3]) << 24);
     uint32_t calc_crc = calc_crc32(buff, EEPROM_CONFIG_CRC_OFFSET);
     if (stored_crc != calc_crc) {
-      printf("EEPROM config CRC mismatch: stored=0x%08X, calc=0x%08X\n",
+      printf("EEPROM config CRC mismatch: stored=0x%08lX, calc=0x%08lX\n",
              stored_crc, calc_crc);
       goto failed;
     }

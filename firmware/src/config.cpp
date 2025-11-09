@@ -1,2 +1,2 @@
-#define CONFIG_IMPLEMENTATION
+#define NTPC_CONFIG_IMPLEMENTATION
 #include "config.hpp"
