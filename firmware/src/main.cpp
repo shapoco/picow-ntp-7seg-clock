@@ -3,7 +3,6 @@
 #include <time.h>
 #include <cstring>
 
-#include <hardware/adc.h>
 #include <hardware/clocks.h>
 #include <hardware/dma.h>
 #include <pico/stdlib.h>
@@ -11,6 +10,8 @@
 #include <vlcfg/vlconfig.hpp>
 
 #include "button.hpp"
+#include "config.hpp"
+#include "eeprom.hpp"
 #include "ntp_client.hpp"
 
 #include "seg7_pwm_tx.pio.h"
@@ -18,10 +19,8 @@
 enum class State {
   IDLE,
   SETUP,
+  VLCFG_ERROR,
 };
-
-static constexpr int SETUP_SW_PORT = 22;
-static constexpr int LIGHT_SENSOR_ADC_CH = 2;
 
 static constexpr int DIGIT_PORTS[] = {0, 1, 2, 3,  4,  5,  6,
                                       7, 8, 9, 10, 11, 12, 13};
@@ -30,50 +29,16 @@ static constexpr int DIGIT_PORT_BASE = 0;
 static constexpr int SEGMENT_PORTS[] = {20, 21, 14, 16, 17, 19, 18, 15};
 static constexpr int SEGMENT_PORT_BASE = 14;
 
-static constexpr uint8_t DIGIT_BLANK = 0x10;
-static constexpr uint8_t DIGIT_HYPHEN = 0x11;
+static constexpr int SETUP_SW_PORT = 22;
 
-static constexpr uint8_t SEGMENT_TABLE[] = {
-    0b00111111,  // 0
-    0b00000110,  // 1
-    0b01011011,  // 2
-    0b01001111,  // 3
-    0b01100110,  // 4
-    0b01101101,  // 5
-    0b01111101,  // 6
-    0b00000111,  // 7
-    0b01111111,  // 8
-    0b01101111,  // 9
-    0b01110111,  // A
-    0b01111100,  // b
-    0b00111001,  // C
-    0b01011110,  // d
-    0b01111001,  // E
-    0b01110001,  // F
-    0b00000000,  // blank
-    0b01000000,  // hyphen
-    0b00000000,  // 0x12
-    0b00000000,  // 0x13
-    0b00000000,  // 0x14
-    0b00000000,  // 0x15
-    0b00000000,  // 0x16
-    0b00000000,  // 0x17
-    0b00000000,  // 0x18
-    0b00000000,  // 0x19
-    0b00000000,  // 0x1A
-    0b00000000,  // 0x1B
-    0b00000000,  // 0x1C
-    0b00000000,  // 0x1D
-    0b00000000,  // 0x1E
-    0b00000000,  // 0x1F
-};
+uint8_t segment_table[256] = {0};
 
 static constexpr int COLON_COEFF = 128;
 static constexpr int HYPHEN_COEFF = 96;
 
 static constexpr int NUM_DIGITS = 14;
 static constexpr int NUM_SEGMENTS = 8;
-static constexpr int PWM_PREC = 10;
+static constexpr int PWM_PREC = 8;
 static constexpr int PWM_PERIOD = 1 << PWM_PREC;
 
 static constexpr int FADE_TIME_MS = 150;
@@ -98,8 +63,8 @@ static constexpr int ANODE_SEL_PERIOD_US = 1000000 / ANODE_SEL_HZ;
 static constexpr int DMA_TX_HZ = ANODE_SEL_HZ * PWM_PERIOD * 11 / 10;
 static constexpr int PIO_CLKDIV = SYSTEM_CLOCK_HZ / DMA_TX_HZ;
 
-uint8_t digits0[NUM_DIGITS] = {0};
-uint8_t digits1[NUM_DIGITS] = {0};
+char digits0[NUM_DIGITS] = {0};
+char digits1[NUM_DIGITS] = {0};
 uint8_t dram0[NUM_DIGITS * NUM_SEGMENTS] = {0};
 uint8_t dram1[NUM_DIGITS * NUM_SEGMENTS] = {0};
 uint8_t dram2[NUM_DIGITS * NUM_SEGMENTS] = {0};
@@ -118,22 +83,7 @@ int epoch_ms = 0;
 
 Button setup_button(SETUP_SW_PORT);
 
-const char *KEY_SSID = "s";
-const char *KEY_PASS = "p";
-const char *KEY_NTP = "n";
-const char *KEY_TIMEZONE = "z";
-char ssid_buff[32 + 1];
-char pass_buff[32 + 1];
-char ntp_buff[64 + 1];
-char tz_buff[8 + 1] = "0900";
-vlcfg::ConfigEntry config_entries[] = {
-    {KEY_SSID, ssid_buff, vlcfg::ValueType::TEXT_STR, sizeof(ssid_buff)},
-    {KEY_PASS, pass_buff, vlcfg::ValueType::TEXT_STR, sizeof(pass_buff)},
-    {KEY_NTP, ntp_buff, vlcfg::ValueType::TEXT_STR, sizeof(ntp_buff)},
-    {KEY_TIMEZONE, tz_buff, vlcfg::ValueType::TEXT_STR, sizeof(tz_buff)},
-    {nullptr, nullptr, vlcfg::ValueType::NONE, 0},  // terminator
-};
-vlcfg::Receiver receiver(256);
+config::Data cfg;
 
 State state = State::IDLE;
 
@@ -142,6 +92,11 @@ void print_digit(int index, int width, int value);
 bool repeating_timer_callback(repeating_timer_t *rt);
 
 void sync_with_ntp();
+void draw_string(const char *s, int start_digit = NUM_DIGITS - 1);
+void clear_digits();
+
+void render_digits(uint8_t alpha);
+void update_dma_buff();
 
 int main() {
   set_sys_clock_khz(SYSTEM_CLOCK_HZ / 1000, true);
@@ -149,7 +104,35 @@ int main() {
 
   // Initialize stdio
   stdio_init_all();
-  sleep_ms(100);
+  sleep_ms(500);
+
+  printf("Hello.\r\n");
+
+  memset(segment_table, 0, sizeof(segment_table));
+  segment_table[' '] = 0b00000000;
+  segment_table['0'] = 0b00111111;
+  segment_table['1'] = 0b00000110;
+  segment_table['2'] = 0b01011011;
+  segment_table['3'] = 0b01001111;
+  segment_table['4'] = 0b01100110;
+  segment_table['5'] = 0b01101101;
+  segment_table['6'] = 0b01111101;
+  segment_table['7'] = 0b00000111;
+  segment_table['8'] = 0b01111111;
+  segment_table['9'] = 0b01101111;
+  segment_table['A'] = 0b01110111;
+  segment_table['B'] = 0b01111100;
+  segment_table['C'] = 0b00111001;
+  segment_table['D'] = 0b01011110;
+  segment_table['E'] = 0b01111001;
+  segment_table['F'] = 0b01110001;
+  segment_table['G'] = 0b00111101;
+  segment_table['I'] = 0b00010000;
+  segment_table['L'] = 0b00111000;
+  segment_table['N'] = 0b01010100;
+  segment_table['O'] = 0b01011100;
+  segment_table['R'] = 0b01010000;
+  segment_table['-'] = 0b01000000;
 
   // Define the GPIO pin number for the LED
   // const uint LED_PIN = 25;
@@ -160,17 +143,16 @@ int main() {
 
   setup_button.init();
 
-  adc_init();
-  adc_gpio_init(26 + LIGHT_SENSOR_ADC_CH);
-  adc_select_input(LIGHT_SENSOR_ADC_CH);
-
   epoch_tick_ms = to_ms_since_boot(get_absolute_time());
+  if (config::init(cfg)) {
+    sync_with_ntp();
+  }
 
   for (int port : DIGIT_PORTS) {
     gpio_init(port);
     gpio_set_dir(port, GPIO_OUT);
     gpio_put(port, false);
-    gpio_drive_strength(GPIO_DRIVE_STRENGTH_12MA);
+    gpio_set_drive_strength(port, GPIO_DRIVE_STRENGTH_12MA);
   }
 
 #if 0
@@ -203,49 +185,56 @@ int main() {
                          &st_timer);
 
   uint64_t t_next_update_ms = 0;
-  uint64_t t_next_sensor_read_ms = 0;
 
   while (true) {
     const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
+    bool recv_success;
 
     setup_button.update();
+    if (setup_button.on_clicked()) {
+      printf("Setup button clicked\r\n");
+    }
 
     switch (state) {
       case State::IDLE:
         if (setup_button.on_clicked()) {
           state = State::SETUP;
-          receiver.init(config_entries);
-          t_next_sensor_read_ms = now_ms + 10;
+          config::recv_start();
           printf("Enter SETUP state\n");
         }
         break;
 
       case State::SETUP:
-        if (now_ms >= t_next_sensor_read_ms) {
-          t_next_sensor_read_ms += 10;
-          vlcfg::RxState rx_state;
-          auto ret = receiver.update(adc_read(), &rx_state);
-          if (ret != vlcfg::Result::SUCCESS ||
-              rx_state == vlcfg::RxState::ERROR) {
-            printf("RX error: %d\n", static_cast<int>(ret));
+        if (config::recv_update(&recv_success, cfg)) {
+          if (recv_success) {
+            sync_with_ntp();
             state = State::IDLE;
-          } else if (rx_state == vlcfg::RxState::COMPLETED) {
-            bool filled = receiver.entry_from_key(KEY_SSID)->was_received() |
-                          receiver.entry_from_key(KEY_PASS)->was_received() |
-                          receiver.entry_from_key(KEY_NTP)->was_received();
-
-            if (filled) {
-              printf("RX completed successfully\n");
-              printf("SSID: '%s'\n", ssid_buff);
-              printf("PASS: '%s'\n", pass_buff);
-              printf("NTP Server: '%s'\n", ntp_buff);
-              sync_with_ntp();
-            } else {
-              printf("RX completed but some fields are empty\n");
-            }
-            state = State::IDLE;
+          } else {
+            state = State::VLCFG_ERROR;
           }
+          // t_next_sensor_read_ms += 10;
+          // vlcfg::RxState rx_state;
+          // vlcfg_err = receiver.update(adc_read(), &rx_state);
+          // if (vlcfg_err != vlcfg::Result::SUCCESS ||
+          //     rx_state == vlcfg::RxState::ERROR) {
+          //   printf("RX error: %d\n", static_cast<int>(vlcfg_err));
+          //   state = State::VLCFG_ERROR;
+          // } else if (rx_state == vlcfg::RxState::COMPLETED) {
+          //   printf("RX completed successfully\n");
+          //   printf("SSID: '%s'\n", ssid_buff);
+          //   printf("PASS: '%s'\n", pass_buff);
+          //   printf("NTP Server: '%s'\n", ntp_buff);
+          //   sync_with_ntp();
+          //   state = State::IDLE;
+          // }
         } else if (setup_button.on_clicked()) {
+          state = State::IDLE;
+          printf("Return to IDLE state\n");
+        }
+        break;
+
+      case State::VLCFG_ERROR:
+        if (setup_button.on_clicked()) {
           state = State::IDLE;
           printf("Return to IDLE state\n");
         }
@@ -257,7 +246,7 @@ int main() {
       t_next_update_ms = now_ms + 5;
     }
 
-    sleep_us(100);
+    // sleep_us(100);
   }
 
   return 0;
@@ -267,7 +256,6 @@ void update_display(uint64_t now_ms) {
   const int64_t elapsed_ms = (now_ms + epoch_ms - epoch_tick_ms);
   const time_t now = epoch_sec + ((elapsed_ms + FADE_TIME_MS * 2) / 1000);
 
-  long timezone_offset = -9 * 3600;
   struct tm *t = gmtime(&now);
 
   int sec = t->tm_sec;
@@ -305,10 +293,8 @@ void update_display(uint64_t now_ms) {
 
     if (transition_num_digits == 0) {
       // 数字の変化点検出
-      bool digit_changed = false;
       for (int idig = NUM_DIGITS - 1; idig >= 0; idig--) {
         if (digits0[idig] != digits1[idig]) {
-          digit_changed = true;
           transition_num_digits = idig + 1;
           transition_start_ms = now_ms;
           break;
@@ -316,14 +302,7 @@ void update_display(uint64_t now_ms) {
       }
       memcpy(digits1, digits0, sizeof(digits0));
 
-      // セグメントにデコード
-      for (int idig = 0; idig < NUM_DIGITS; idig++) {
-        uint8_t seg_bits = SEGMENT_TABLE[digits1[idig] & 0x1F];
-        for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
-          dram0[idig * NUM_SEGMENTS + iseg] = (seg_bits & 1) ? 255 : 0;
-          seg_bits >>= 1;
-        }
-      }
+      render_digits(255);
 
       // 日付のハイフン点灯
       dram0[8 * NUM_SEGMENTS + 7] = HYPHEN_COEFF;
@@ -358,7 +337,7 @@ void update_display(uint64_t now_ms) {
       }
 
       // アニメーション完了
-      if (t >= transition_num_digits * DIGIT_DELAY_MS + FADE_TIME_MS * 3) {
+      if ((int)t >= transition_num_digits * DIGIT_DELAY_MS + FADE_TIME_MS * 3) {
         memcpy(dram1, dram0, sizeof(dram0));
         transition_num_digits = 0;
       }
@@ -369,71 +348,48 @@ void update_display(uint64_t now_ms) {
     dram2[4 * NUM_SEGMENTS + 7] = 128 * blink_alpha / 256;
   } else {
     // 時刻未設定時の表示
-    for (int idig = 0; idig < NUM_DIGITS; idig++) {
-      digits0[idig] = DIGIT_HYPHEN;
-    }
-
     if (state == State::SETUP) {
-      uint8_t hex = receiver.get_last_byte();
-      digits0[6] = hex & 0x0F;
-      digits0[7] = (hex >> 4) & 0x0F;
+      clear_digits();
+      if (config::is_receiving()) {
+        draw_string("LOADING");
+      } else {
+        draw_string("CONFIG");
+      }
+    } else if (state == State::VLCFG_ERROR) {
+      clear_digits();
+      vlcfg::Result err = config::last_vlcfg_error();
+      char msg[16];
+      snprintf(msg, sizeof(msg), "ERROR %02X", static_cast<int>(err));
+      draw_string(msg);
+    } else {
+      memset(digits0, '-', sizeof(digits0));
     }
 
     memcpy(digits1, digits0, sizeof(digits0));
 
-    for (int idig = 0; idig < NUM_DIGITS; idig++) {
-      uint8_t seg_bits = SEGMENT_TABLE[digits1[idig] & 0x1F];
-      for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
-        dram0[idig * NUM_SEGMENTS + iseg] = (seg_bits & 1) ? blink_alpha : 0;
-        seg_bits >>= 1;
-      }
-    }
-    dram0[2 * NUM_SEGMENTS + 7] = COLON_COEFF * blink_alpha / 256;
-    dram0[4 * NUM_SEGMENTS + 7] = COLON_COEFF * blink_alpha / 256;
-    dram0[8 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * blink_alpha / 256;
-    dram0[10 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * blink_alpha / 256;
+    render_digits(blink_alpha);
 
-    if (state == State::SETUP) {
-      dram0[6 * NUM_SEGMENTS + 7] = receiver.get_last_bit() ? 255 : 0;
-      dram0[7 * NUM_SEGMENTS + 7] = 255;
+    if (state == State::IDLE) {
+      // ハイフンとコロンの点滅
+      dram0[2 * NUM_SEGMENTS + 7] = COLON_COEFF * blink_alpha / 256;
+      dram0[4 * NUM_SEGMENTS + 7] = COLON_COEFF * blink_alpha / 256;
+      dram0[8 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * blink_alpha / 256;
+      dram0[10 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * blink_alpha / 256;
+    } else {
+      // 受信状態の表示
+      dram0[6 * NUM_SEGMENTS + 7] = config::last_bit() ? 255 : 0;
     }
-
     memcpy(dram1, dram0, sizeof(dram0));
     memcpy(dram2, dram0, sizeof(dram0));
   }
 
-  for (int d = 0; d < NUM_DIGITS; d++) {
-    uint16_t thresh[NUM_SEGMENTS] = {0};
-    for (int s = 0; s < NUM_SEGMENTS; s++) {
-      uint32_t val = dram2[d * NUM_SEGMENTS + s];
-#if 0
-        val = val * val * val;
-        val /= (255 * 255 * 255) / (PWM_PERIOD - 1);
-#else
-      val = val * val;
-      val = val * (PWM_PERIOD - 1) / (255 * 255);
-#endif
-      thresh[s] = val;
-    }
-
-    int ofst = d * PWM_PERIOD;
-    for (int t = 0; t < PWM_PERIOD; t++) {
-      uint8_t seg_bits = 0;
-      for (int iseg = 0; iseg < NUM_SEGMENTS; iseg++) {
-        if (t < thresh[iseg]) {
-          int iport = SEGMENT_PORTS[iseg] - SEGMENT_PORT_BASE;
-          seg_bits |= (1 << iport);
-        }
-      }
-      dma_buff[ofst + t] = ~seg_bits;
-    }
-  }
+  update_dma_buff();
 }
 
 void print_digit(int index, int width, int value) {
-  uint8_t *wptr = digits0 + index;
+  char *wptr = digits0 + index;
   for (int i = 0; i < width; i++) {
-    *(wptr++) = value % 10;
+    *(wptr++) = '0' + (value % 10);
     value /= 10;
   }
 }
@@ -481,15 +437,11 @@ void sync_with_ntp() {
   for (int i = 0; i < NUM_DIGITS * PWM_PERIOD; i++) {
     dma_buff[i] = 0xFF;
   }
-  ntp::WiFiConfig wifi_config = {
-      .country = CYW43_COUNTRY_JAPAN,
-      .ssid = ssid_buff,
-      .password = pass_buff,
-  };
+
   uint64_t time;
-  auto res = ntp::get_time(wifi_config, ntp_buff, &time);
+  auto res = ntp::get_time(cfg, &time);
   if (res == ntp::result_t::SUCCESS) {
-    int tz = atoi(tz_buff);
+    int tz = atoi(cfg.timezone);
     int tz_hour = tz / 100;
     int tz_min = tz % 100;
     time += (uint64_t)(tz_hour * 3600 + tz_min * 60) * 1000;
@@ -499,5 +451,56 @@ void sync_with_ntp() {
     epoch_tick_ms = to_ms_since_boot(get_absolute_time());
   } else {
     printf("NTP time fetch failed: %d\n", static_cast<int>(res));
+  }
+}
+
+void draw_string(const char *s, int start_digit) {
+  int i = start_digit;
+  while (*s && i >= 0) {
+    digits0[i--] = *s++;
+  }
+}
+
+void clear_digits() {
+  memset(digits0, ' ', sizeof(digits0));
+  memset(digits1, ' ', sizeof(digits1));
+}
+
+void render_digits(uint8_t alpha) {
+  for (int idig = 0; idig < NUM_DIGITS; idig++) {
+    uint8_t seg_bits = segment_table[(int)digits1[idig]];
+    for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
+      dram0[idig * NUM_SEGMENTS + iseg] = (seg_bits & 1) ? alpha : 0;
+      seg_bits >>= 1;
+    }
+  }
+}
+
+void update_dma_buff() {
+  for (int d = 0; d < NUM_DIGITS; d++) {
+    uint16_t thresh[NUM_SEGMENTS] = {0};
+    for (int s = 0; s < NUM_SEGMENTS; s++) {
+      uint32_t val = dram2[d * NUM_SEGMENTS + s];
+#if 0
+        val = val * val * val;
+        val /= (255 * 255 * 255) / (PWM_PERIOD - 1);
+#else
+      val = val * val;
+      val = val * (PWM_PERIOD - 1) / (255 * 255);
+#endif
+      thresh[s] = val;
+    }
+
+    int ofst = d * PWM_PERIOD;
+    for (int t = 0; t < PWM_PERIOD; t++) {
+      uint8_t seg_bits = 0;
+      for (int iseg = 0; iseg < NUM_SEGMENTS; iseg++) {
+        if (t < thresh[iseg]) {
+          int iport = SEGMENT_PORTS[iseg] - SEGMENT_PORT_BASE;
+          seg_bits |= (1 << iport);
+        }
+      }
+      dma_buff[ofst + t] = ~seg_bits;
+    }
   }
 }

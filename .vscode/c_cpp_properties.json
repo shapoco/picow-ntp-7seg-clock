@@ -49,7 +49,8 @@
                 "${workspaceFolder}/submodules/vlconfig/cpp/lib/include"
             ],
             "defines": [
-                "NTP_CLIENT_IMPLEMENTATION"
+                "NTP_CLIENT_IMPLEMENTATION",
+                "CONFIG_IMPLEMENTATION"
             ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",

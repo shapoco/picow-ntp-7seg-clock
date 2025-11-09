@@ -44,6 +44,7 @@ target_link_libraries(${APP_NAME} PRIVATE
     #pico_cyw43_arch_lwip_threadsafe_background
     hardware_adc
     hardware_dma
+    hardware_i2c
     vlcfg
 )
 
