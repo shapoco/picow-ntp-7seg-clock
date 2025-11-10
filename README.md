@@ -76,7 +76,7 @@ The settings are sent to the clock by flashing the screen of your PC or smartpho
     > [!WARNING]
     > Please make sure that the blinking light is not visible to third parties, as the information entered into the form is not encrypted.
 
-5. The display will turn off and show the time once the Wi-Fi connection and NTP synchronization are successful.
+5. The display will go blank for a few seconds, then show the time once the Wi-Fi connection and NTP synchronization are successful.
 
 
 For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.
