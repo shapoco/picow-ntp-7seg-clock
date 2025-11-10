@@ -46,7 +46,7 @@ NTP clock with animated 7-segment display.
 |RUN|Reset Switch|
 |GP26 (i2c1_sda)|EEPROM|
 |GP27 (i2c1_scl)|EEPROM|
-|GP28 (ADC3)|Light Sensor|
+|GP28 (ADC2)|Light Sensor|
 
 ## Building Firmware
 
