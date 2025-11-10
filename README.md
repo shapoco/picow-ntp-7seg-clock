@@ -51,20 +51,22 @@ NTP clock with animated 7-segment display.
 ## Building Firmware
 
 1. Install [Pico SDK](https://github.com/raspberrypi/pico-sdk) and set `PICO_SDK_PATH` environment variable.
-2. Run `make` in `firmware/`.
+2. Run `make` in `firmware/` directory.
 
     ```sh
     cd firmware
     make
     ```
 
-3. `ntp_clock.uf2` generated in `firmware/build/` directory.
+3. `ntp_clock.uf2` generated in `firmware/bin/` directory.
 
 ## Setting Wi-Fi and NTP server
 
-1. Open the [Setup Page](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:JP%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:ntp.nict.jp%7D,%7Bk:z,t:t,l:Time%20Offset,v:%220900%22%7D%5D%7D) and fill the form.
+1. Open the setup page from link below and fill the form.
+    - [Japan](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:JP%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:ntp.nict.jp%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%220900%22%7D%5D%7D)
+    - [United States (EST)](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:US%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:pool.ntp.org%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%22-0400%22%7D%5D%7D)
 2. Press the Setup switch.
-3. Place the light sensor over the lamp on the Setup Page and click the Submit button.
+3. Place the light sensor over the lamp on the setup page and click the Submit button.
 4. Wait until the light stops flashing.
 
 > [!WARNING]
