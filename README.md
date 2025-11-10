@@ -18,6 +18,8 @@ NTP clock with animated 7-segment display.
 
 ![](./img/connection.png)
 
+To avoid burning your Raspberry Pi Pico, I recommend inserting a buffer IC between the LED and the Pico (I'm lazy so I just wired them directly, but so far I haven't had any problems).
+
 |Port|Connection|
 |:--|:--|
 |GP0|Digit\[0\]|
