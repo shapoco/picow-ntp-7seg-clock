@@ -1,4 +1,6 @@
-# NTP 7-segment Clock
+# [WIP] NTP 7-segment Clock
+
+![](./img/cover.jpg)
 
 NTP clock with 7-segment display.
 
