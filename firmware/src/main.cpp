@@ -31,70 +31,78 @@ int main() {
   set_sys_clock_khz(SYSTEM_CLOCK_HZ / 1000, true);
   sleep_ms(100);
 
-  stdio_init_all();
+  stdio_inited = stdio_init_all();
   sleep_ms(500);
 
-  printf("Hello.\r\n");
+  NTPC_PRINTF("Hello.\r\n");
 
-  ctx.state = State::IDLE;
-  ctx.epoch_ms = 0;
-  ctx.epoch_sec = 0;
-  ctx.epoch_tick_ms = 0;
+  ctx.state = state_t::IDLE;
+  ctx.origin_time_ms = 0;
+  ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
+  ctx.next_sync_tick_ms = 0;
+  ctx.last_error = result_t::SUCCESS;
 
   display::init();
 
   setup_button.init();
 
-  ctx.epoch_tick_ms = to_ms_since_boot(get_absolute_time());
-  if (config::init(cfg)) {
-    sync_with_ntp();
-  }
+  ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
+  config::init(cfg);
 
-  uint64_t t_next_update_ms = 0;
+  uint64_t t_next_button_update_ms = 0;
+  uint64_t t_next_display_update_ms = 0;
 
   while (true) {
-    const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
-    bool recv_success;
+    const uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
+    bool pulse_1ms = (tick_ms >= t_next_button_update_ms);
+    if (pulse_1ms) {
+      t_next_button_update_ms = tick_ms + 1;
+    }
 
-    setup_button.update();
+    setup_button.update(pulse_1ms);
+
     if (setup_button.on_clicked()) {
-      printf("Setup button clicked\r\n");
+      NTPC_PRINTF("Setup button clicked\r\n");
     }
 
     switch (ctx.state) {
-      case State::IDLE:
-        if (setup_button.on_clicked()) {
-          ctx.state = State::SETUP;
+      case state_t::IDLE:
+        if (tick_ms >= ctx.next_sync_tick_ms) {
+          sync_with_ntp();
+        } else if (setup_button.on_clicked()) {
+          ctx.state = state_t::SETUP;
           config::recv_start();
-          printf("Enter SETUP state\n");
+          NTPC_PRINTF("Enter SETUP state\n");
         }
+
         break;
 
-      case State::SETUP:
+      case state_t::SETUP: {
+        bool recv_success;
         if (config::recv_update(&recv_success, cfg)) {
           if (recv_success) {
             sync_with_ntp();
-            ctx.state = State::IDLE;
+            ctx.state = state_t::IDLE;
           } else {
-            ctx.state = State::VLCFG_ERROR;
+            ctx.state = state_t::VLCFG_ERROR;
           }
         } else if (setup_button.on_clicked()) {
-          ctx.state = State::IDLE;
-          printf("Return to IDLE state\n");
+          ctx.state = state_t::IDLE;
+          NTPC_PRINTF("Return to IDLE state\n");
         }
-        break;
+      } break;
 
-      case State::VLCFG_ERROR:
+      case state_t::VLCFG_ERROR:
         if (setup_button.on_clicked()) {
-          ctx.state = State::IDLE;
-          printf("Return to IDLE state\n");
+          ctx.state = state_t::IDLE;
+          NTPC_PRINTF("Return to IDLE state\n");
         }
         break;
     }
 
-    if (now_ms >= t_next_update_ms) {
-      display::update_display(now_ms, ctx);
-      t_next_update_ms = now_ms + 5;
+    if (tick_ms >= t_next_display_update_ms) {
+      display::update_display(ctx, tick_ms);
+      t_next_display_update_ms = tick_ms + 5;
     }
   }
 
@@ -106,18 +114,29 @@ void sync_with_ntp() {
 
   uint64_t time;
   auto res = ntp::get_time(cfg, &time);
-  if (res == ntp::result_t::SUCCESS) {
-    int tz = atoi(cfg.timezone);
-    int tz_hour = tz / 100;
-    int tz_min = tz % 100;
-    time += (uint64_t)(tz_hour * 3600 + tz_min * 60) * 1000;
-
-    ctx.epoch_sec = (time / 1000);
-    ctx.epoch_ms = (time % 1000);
-    ctx.epoch_tick_ms = to_ms_since_boot(get_absolute_time());
-    printf("NTP time synchronized: epoch_sec=%lu, epoch_ms=%llu\n",
-           ctx.epoch_sec, ctx.epoch_ms);
-  } else {
-    printf("NTP time fetch failed: %d\n", static_cast<int>(res));
+  if (res != ntp::result_t::SUCCESS) {
+    ctx.last_error = res;
+    // 10分後に再試行
+    ctx.next_sync_tick_ms = to_ms_since_boot(get_absolute_time()) + 600 * 1000;
+    NTPC_PRINTF("NTP time fetch failed: %d\n", static_cast<int>(res));
+    return;
   }
+
+  int tz = atoi(cfg.timezone);
+  int tz_hour = tz / 100;
+  int tz_min = tz % 100;
+  time += (uint64_t)(tz_hour * 3600 + tz_min * 60) * 1000;
+
+  ctx.origin_time_ms = time;
+  ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
+  ctx.last_error = result_t::SUCCESS;
+
+  // 次の朝5時に同期する
+  time_t now_sec = time / 1000;
+  struct tm *t = gmtime(&now_sec);
+  int time_sec = t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec;
+  int sec_to_next_sync = ((24 + 5) * 3600 - time_sec) % (24 * 3600);
+  ctx.next_sync_tick_ms = ctx.origin_tick_ms + sec_to_next_sync * 1000;
+
+  NTPC_PRINTF("NTP time synchronized.\n");
 }

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "common.hpp"
 #include "eeprom.hpp"
 
 #include <vlcfg/vlconfig.hpp>
@@ -99,9 +100,9 @@ bool init(Data &cfg) {
   adc_init();
   adc_gpio_init(26 + LIGHT_SENSOR_ADC_CH);
   adc_select_input(LIGHT_SENSOR_ADC_CH);
-  printf("Initializing EEPROM...\n");
+  NTPC_PRINTF("Initializing EEPROM...\n");
   rom.init();
-  printf("Loading config from EEPROM...\n");
+  NTPC_PRINTF("Loading config from EEPROM...\n");
   return eeprom_load_config(cfg);
 }
 
@@ -128,7 +129,7 @@ bool recv_update(bool *success, Data &cfg) {
   vlcfg_err = receiver.update(adc_read(), &rx_state);
   if (vlcfg_err != vlcfg::Result::SUCCESS ||
       rx_state == vlcfg::RxState::ERROR) {
-    printf("RX error: %d\n", static_cast<int>(vlcfg_err));
+    NTPC_PRINTF("RX error: %d\n", static_cast<int>(vlcfg_err));
     if (success) *success = false;
     return true;
   } else if (rx_state == vlcfg::RxState::COMPLETED) {
@@ -152,17 +153,17 @@ bool recv_update(bool *success, Data &cfg) {
       strncpy(cfg.timezone, timezone_buff, TIMEZONE_MAX_LEN);
       cfg.timezone[TIMEZONE_MAX_LEN] = '\0';
     }
-    printf("RX completed successfully\n");
-    printf("Country: '%s'\n", country_buff);
-    printf("SSID: '%s'\n", ssid_buff);
-    printf("PASS: '%s'\n", pass_buff);
-    printf("NTP Server: '%s'\n", ntp_buff);
-    printf("Timezone: '%s'\n", timezone_buff);
+    NTPC_PRINTF("RX completed successfully\n");
+    NTPC_PRINTF("Country: '%s'\n", country_buff);
+    NTPC_PRINTF("SSID: '%s'\n", ssid_buff);
+    NTPC_PRINTF("PASS: '%s'\n", pass_buff);
+    NTPC_PRINTF("NTP Server: '%s'\n", ntp_buff);
+    NTPC_PRINTF("Timezone: '%s'\n", timezone_buff);
 
     if (eeprom_save_config(cfg)) {
-      printf("Config saved to EEPROM\n");
+      NTPC_PRINTF("Config saved to EEPROM\n");
     } else {
-      printf("Failed to save config to EEPROM\n");
+      NTPC_PRINTF("Failed to save config to EEPROM\n");
     }
 
     if (success) *success = true;
@@ -186,7 +187,7 @@ static bool eeprom_load_config(Data &cfg) {
   uint8_t *buff = new uint8_t[EEPROM_CONFIG_SIZE];
 
   if (rom.read_data(0, buff, EEPROM_CONFIG_SIZE) != eeprom::result_t::SUCCESS) {
-    printf("Failed to read config from EEPROM\n");
+    NTPC_PRINTF("Failed to read config from EEPROM\n");
     goto failed;
   }
 
@@ -198,7 +199,7 @@ static bool eeprom_load_config(Data &cfg) {
         ((uint32_t)(buff[EEPROM_CONFIG_CRC_OFFSET + 3]) << 24);
     uint32_t calc_crc = calc_crc32(buff, EEPROM_CONFIG_CRC_OFFSET);
     if (stored_crc != calc_crc) {
-      printf("EEPROM config CRC mismatch: stored=0x%08lX, calc=0x%08lX\n",
+      NTPC_PRINTF("EEPROM config CRC mismatch: stored=0x%08lX, calc=0x%08lX\n",
              stored_crc, calc_crc);
       goto failed;
     }
@@ -241,7 +242,7 @@ static bool eeprom_save_config(const Data &cfg) {
 
   if (rom.write_data(0, buff, EEPROM_CONFIG_SIZE) !=
       eeprom::result_t::SUCCESS) {
-    printf("Failed to write config to EEPROM\n");
+    NTPC_PRINTF("Failed to write config to EEPROM\n");
     goto failed;
   }
   success = true;

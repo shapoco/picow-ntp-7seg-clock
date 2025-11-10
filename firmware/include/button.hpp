@@ -21,9 +21,11 @@ class Button {
     state = false;
   }
 
-  inline void update() {
-    bool down = gpio_get(port) == 0;
-    shift_reg = (shift_reg << 1) | (down ? 1 : 0);
+  inline void update(bool pulse_1ms) {
+    if (pulse_1ms) {
+      bool down = gpio_get(port) == 0;
+      shift_reg = (shift_reg << 1) | (down ? 1 : 0);
+    }
 
     bool last_state = state;
     if (shift_reg == 0xFF) {
