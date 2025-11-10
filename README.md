@@ -62,14 +62,21 @@ NTP clock with animated 7-segment display.
 
 ## Setting Wi-Fi and NTP server
 
-1. Open the setup page from link below and fill the form.
+The settings are sent to the clock by flashing the screen of your PC or smartphone.
+
+1. Open the setup page from the link below and fill the form.
+
     - [Japan](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:JP%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:ntp.nict.jp%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%220900%22%7D%5D%7D)
     - [United States (EST)](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:US%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:pool.ntp.org%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%22-0400%22%7D%5D%7D)
-2. Press the Setup switch.
+
+2. Press the setup switch (`ConfiG` will appear on the display).
 3. Place the light sensor over the lamp on the setup page and click the Submit button.
 4. Wait until the light stops flashing.
 
-> [!WARNING]
-> Please make sure that the blinking light is not visible to third parties, as the information entered into the form is not encrypted.
+    > [!WARNING]
+    > Please make sure that the blinking light is not visible to third parties, as the information entered into the form is not encrypted.
+
+5. The display will turn off and show the time once the Wi-Fi connection and NTP synchronization are successful.
+
 
 For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.
