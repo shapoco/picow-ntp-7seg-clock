@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(APP_NAME display_test)
+set(APP_NAME ntp_clock)
 set(APP_INC_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(APP_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
 set(SUBMODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../submodules)

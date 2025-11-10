@@ -1,10 +1,10 @@
-# [WIP] NTP 7-segment Clock
+# [WIP] Animated 7-segment Clock
 
-![](./img/cover.jpg)
+<p align="center"><img src="./img/cover.gif" width="1280"></p>
 
-NTP clock with 7-segment display.
+NTP clock with animated 7-segment display.
 
-## Parts
+## Components
 
 |Part|Type|
 |:--|:--|
@@ -47,6 +47,18 @@ NTP clock with 7-segment display.
 |GP26 (i2c1_sda)|EEPROM|
 |GP27 (i2c1_scl)|EEPROM|
 |GP28 (ADC3)|Light Sensor|
+
+## Building Firmware
+
+1. Install [Pico SDK](https://github.com/raspberrypi/pico-sdk) and set `PICO_SDK_PATH` environment variable.
+2. Run `make` in `firmware/`.
+
+    ```sh
+    cd firmware
+    make
+    ```
+
+3. `ntp_clock.uf2` generated in `firmware/build/` directory.
 
 ## Setting Wi-Fi and NTP server
 

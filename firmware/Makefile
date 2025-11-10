@@ -1,6 +1,6 @@
 .PHONY: all build clean distclean
 
-APP_NAME = display_test
+APP_NAME = ntp_clock
 REPO_DIR = $(shell git rev-parse --show-toplevel)
 BUILD_DIR = build
 BIN_DIR = bin/$(BOARD)
