@@ -2,27 +2,6 @@
 
 NTP clock with 7-segment display.
 
-## Connection
-
-|Connection|Port||Port|Connection|
-|:--|:--|:--|:--|:--|
-|Digit\[0\]|GP0||||
-|Digit\[1\]|GP1||||
-|Digit\[2\]|GP2||||
-|Digit\[3\]|GP3||||
-|Digit\[4\]|GP4||3V3_OUT||
-|Digit\[5\]|GP5||GP28 (ADC3)|Light Sensor|
-|Digit\[6\]|GP6||GP27 (i2c1_scl)|EEPROM|
-|Digit\[7\]|GP7||GP26 (i2c1_sda)|EEPROM|
-|Digit\[8\]|GP8||RUN|Reset Switch|
-|Digit\[9\]|GP9||GP22|Setup Switch|
-|Digit\[10\]|GP10||GP21|Segment 'b'|
-|Digit\[11\]|GP11||GP20|Segment 'a'|
-|Digit\[12\]|GP12||GP19|Segment 'f'|
-|Digit\[13\]|GP13||GP18|Segment 'g'|
-|Segment 'c'|GP14||GP17|Segment 'e'|
-|Segment 'dp'|GP15||GP16|Segment 'd'|
-
 ## Parts
 
 |Part|Type|
@@ -32,6 +11,40 @@ NTP clock with 7-segment display.
 |EEPROM|[AT24C32E](https://akizukidenshi.com/catalog/g/g115715/)|
 |Light Sensor|[NJL7502L](https://akizukidenshi.com/catalog/g/g102325/)|
 |Switch|Tactile Switch (Active Low)|
+
+## Connection
+
+![](./img/connection.png)
+
+|Port|Connection|
+|:--|:--|
+|GP0|Digit\[0\]|
+|GP1|Digit\[1\]|
+|GP2|Digit\[2\]|
+|GP3|Digit\[3\]|
+|GP4|Digit\[4\]|
+|GP5|Digit\[5\]|
+|GP6|Digit\[6\]|
+|GP7|Digit\[7\]|
+|GP8|Digit\[8\]|
+|GP9|Digit\[9\]|
+|GP10|Digit\[10\]|
+|GP11|Digit\[11\]|
+|GP12|Digit\[12\]|
+|GP13|Digit\[13\]|
+|GP14|Segment 'c'|
+|GP15|Segment 'dp'|
+|GP16|Segment 'd'|
+|GP17|Segment 'e'|
+|GP18|Segment 'g'|
+|GP19|Segment 'f'|
+|GP20|Segment 'a'|
+|GP21|Segment 'b'|
+|GP22|Setup Switch|
+|RUN|Reset Switch|
+|GP26 (i2c1_sda)|EEPROM|
+|GP27 (i2c1_scl)|EEPROM|
+|GP28 (ADC3)|Light Sensor|
 
 ## 7-segment LED
 
