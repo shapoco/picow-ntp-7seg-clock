@@ -72,11 +72,11 @@ The settings are sent to the clock by flashing the screen of your PC or smartpho
 2. Press the setup switch (`ConfiG` will appear on the display).
 3. Place the light sensor over the lamp on the setup page and click the Submit button.
 4. Wait until the light stops flashing.
-
-    > [!WARNING]
-    > Please make sure that the blinking light is not visible to third parties, as the information entered into the form is not encrypted.
-
 5. The display will go blank for a few seconds, then show the time once the Wi-Fi connection and NTP synchronization are successful.
 
+The received configuration data is stored in EEPROM.
+
+> [!WARNING]
+> The light signal and the data in the EEPROM are not encrypted, so be careful not to let someone spy on you watching the flashing or steal your clock.
 
 For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.
