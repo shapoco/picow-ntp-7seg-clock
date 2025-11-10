@@ -57,3 +57,5 @@ NTP clock with 7-segment display.
 
 > [!WARNING]
 > Please make sure that the blinking light is not visible to third parties, as the information entered into the form is not encrypted.
+
+For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.
