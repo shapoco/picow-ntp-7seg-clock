@@ -5,6 +5,12 @@
 
 namespace ntpc {
 
+static constexpr int REGION_MAX_LEN = 4;
+static constexpr int SSID_MAX_LEN = 32;
+static constexpr int PASSWORD_MAX_LEN = 32;
+static constexpr int NTP_HOST_MAX_LEN = 128;
+static constexpr int TIMEZONE_MAX_LEN = 8;
+
 enum class state_t {
   IDLE,
   SETUP,
@@ -30,6 +36,14 @@ struct Context {
   uint64_t last_try_time_ms;
   uint64_t next_sync_tick_ms;
   result_t last_error;
+};
+
+struct Config {
+  char region[REGION_MAX_LEN + 1];
+  char ssid[SSID_MAX_LEN + 1];
+  char password[PASSWORD_MAX_LEN + 1];
+  char ntp_host[NTP_HOST_MAX_LEN + 1];
+  char timezone[TIMEZONE_MAX_LEN + 1];
 };
 
 static constexpr int SYSTEM_CLOCK_HZ = 125000000;

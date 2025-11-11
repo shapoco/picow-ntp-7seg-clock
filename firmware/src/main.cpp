@@ -23,7 +23,7 @@ Context ctx;
 
 Button setup_button(SETUP_SW_PORT);
 
-config::Data cfg;
+config::Config cfg;
 
 void sync_with_ntp();
 
@@ -70,16 +70,16 @@ int main() {
         if (tick_ms >= ctx.next_sync_tick_ms) {
           sync_with_ntp();
         } else if (setup_button.on_clicked()) {
-          ctx.state = state_t::SETUP;
-          config::recv_start();
           NTPC_PRINTF("Enter SETUP state\n");
+          ctx.state = state_t::SETUP;
+          config::start(cfg);
         }
         break;
 
       case state_t::SETUP: {
-        bool recv_success;
-        if (config::recv_update(&recv_success, cfg)) {
-          if (recv_success) {
+        bool success = false;
+        if (config::update(cfg, &success)) {
+          if (success) {
             sync_with_ntp();
             ctx.state = state_t::IDLE;
           } else {
