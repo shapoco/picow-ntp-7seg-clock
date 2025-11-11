@@ -9,16 +9,23 @@ NTP clock with animated 7-segment display.
 |Part|Type|
 |:--|:--|
 |MCU|RaspberryPi Pico2W|
-|LED|SS512UWWB (Anode Common White LED)|
+|LED|anode common 7-segment LEDs (\*),<br>and same color chip LEDs|
 |EEPROM|[AT24C32E](https://akizukidenshi.com/catalog/g/g115715/)|
 |Light Sensor|[NJL7502L](https://akizukidenshi.com/catalog/g/g102325/)|
-|Switch|Tactile Switch (Active Low)|
+|Switch|tactile switch|
+|Others|some resistors and capacitors|
+
+(\*) I used `SS512UWWB`, which I bought at a local parts store, but I couldn't find its datasheet.
 
 ## Connection
 
 ![](./img/connection.png)
 
-To avoid burning your Raspberry Pi Pico, I recommend inserting a buffer IC between the LED and the Pico (I'm lazy so I just wired them directly, but so far I haven't had any problems).
+> [!NOTE]
+> The value of the LED's current-limiting resistor should basically be determined based on V<sub>F</sub> and I<sub>F</sub>, but keep in mind that because it is a dynamic scanning method, the LED will appear much dimmer than if current were to flow continuously.
+
+> [!WARNING]
+> To avoid burning your Raspberry Pi Pico, I recommend inserting a buffer IC between the LED and the Pico (I'm lazy so I just wired them directly, but so far I haven't had any problems).
 
 |Port|Connection|
 |:--|:--|
@@ -71,7 +78,7 @@ The settings are sent to the clock by flashing the screen of your PC or smartpho
     - [Japan](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:JP%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:ntp.nict.jp%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%220900%22%7D%5D%7D)
     - [United States (EST)](https://shapoco.github.io/vlconfig/#form:%7Bt:Setup%20NTP%20Clock,e:%5B%7Bk:c,t:t,l:WiFi%20Country%20Code,v:US%7D,%7Bk:s,t:t,l:SSID%7D,%7Bk:p,t:p,l:Password%7D,%7Bk:n,t:t,l:NTP%20Server,v:pool.ntp.org%7D,%7Bk:z,t:t,l:UTC%20Offset%20%28HHMM%29,v:%22-0400%22%7D%5D%7D)
 
-2. Press the setup switch (`ConfiG` will appear on the display).
+2. Press the setup switch (`ConFiG` will appear on the display).
 3. Place the light sensor over the lamp on the setup page and click the Submit button.
 4. Wait until the light stops flashing.
 5. The display will go blank for a few seconds, then show the time once the Wi-Fi connection and NTP synchronization are successful.
