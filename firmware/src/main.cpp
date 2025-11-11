@@ -100,7 +100,7 @@ int main() {
     }
 
     if (tick_ms >= t_next_display_update_ms) {
-      display::update_display(ctx, tick_ms);
+      display::update_display(ctx);
       t_next_display_update_ms = tick_ms + 5;
     }
   }

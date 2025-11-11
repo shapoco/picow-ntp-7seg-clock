@@ -128,7 +128,8 @@ void init() {
                          &st_timer);
 }
 
-void update_display(Context &ctx, uint64_t tick_ms) {
+void update_display(Context &ctx) {
+    uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
   const uint64_t time_ms = ctx.origin_time_ms + (tick_ms - ctx.origin_tick_ms);
 
   if (ctx.state == state_t::IDLE) {
@@ -185,7 +186,7 @@ void update_display(Context &ctx, uint64_t tick_ms) {
 void turn_off() {
   memset(digits0, 0, sizeof(digits0));
   memset(digits1, 0, sizeof(digits1));
-  transition_num_digits = NUM_DIGITS;
+  transition_num_digits = 0;
 
   memset(dram0, 0, sizeof(dram0));
   memset(dram1, 0, sizeof(dram1));

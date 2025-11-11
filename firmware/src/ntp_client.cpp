@@ -57,11 +57,19 @@ result_t get_time(const config::Config &cfg, uint64_t *out_time) {
     }
   }
 
-  NTPC_PRINTF("Initializing CYW43 arch with country code 0x%08lX\n", country);
-  if (cyw43_arch_init_with_country(country)) {
-    NTPC_PRINTF("NTP client: ARCH init failed\n");
-    ret = result_t::LWIP_ARCH_INIT_FAILED;
-    goto init_failed;
+  {
+    NTPC_PRINTF("Initializing CYW43 arch with country code 0x%08lX\n", country);
+    int err;
+    if (country) {
+      err = cyw43_arch_init_with_country(country);
+    } else {
+      err = cyw43_arch_init();
+    }
+    if (err != 0) {
+      NTPC_PRINTF("NTP client: ARCH init failed\n");
+      ret = result_t::LWIP_ARCH_INIT_FAILED;
+      goto init_failed;
+    }
   }
 
   cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);

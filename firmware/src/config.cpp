@@ -71,11 +71,11 @@ bool init(Config &cfg) {
 }
 
 void start(Config &cfg) {
-  strncpy(buff.region, "US", sizeof(buff.region) - 1);
   buff.region[0] = '\0';
-  buff.region[0] = '\0';
-  strncpy(buff.ntp_host, "pool.ntp.org", sizeof(buff.ntp_host) - 1);
-  strncpy(buff.timezone, "0900", sizeof(buff.timezone) - 1);
+  buff.ssid[0] = '\0';
+  buff.password[0] = '\0';
+  buff.ntp_host[0] = '\0';
+  buff.timezone[0] = '\0';
   receiver.init(config_entries);
   const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
   t_next_sensor_read_ms = now_ms + 10;
@@ -86,37 +86,44 @@ void start(Config &cfg) {
 }
 
 bool update(Config &cfg, bool *success) {
+  bool completed = false;
+
+  *success = false;
+
   const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
-  if (now_ms < t_next_sensor_read_ms) {
-    return false;
+  if (now_ms > t_next_sensor_read_ms) {
+    t_next_sensor_read_ms += 10;
+
+    vlcfg::RxState rx_state;
+    vlcfg_err = receiver.update(adc_read(), &rx_state);
+    if (vlcfg_err != vlcfg::Result::SUCCESS ||
+        rx_state == vlcfg::RxState::ERROR) {
+      NTPC_PRINTF("RX error: %d\n", static_cast<int>(vlcfg_err));
+      return true;
+    } else if (rx_state == vlcfg::RxState::COMPLETED) {
+      cfg = buff;
+      NTPC_PRINTF("RX completed successfully\n");
+      completed = true;
+    }
   }
 
-  t_next_sensor_read_ms += 10;
+  if (!completed && ntpc::stdio_inited) {
+    completed |= cli::update(cfg);
+  }
 
-  vlcfg::RxState rx_state;
-  vlcfg_err = receiver.update(adc_read(), &rx_state);
-  if (vlcfg_err != vlcfg::Result::SUCCESS ||
-      rx_state == vlcfg::RxState::ERROR) {
-    NTPC_PRINTF("RX error: %d\n", static_cast<int>(vlcfg_err));
-    if (success) *success = false;
-    return true;
-  } else if (rx_state == vlcfg::RxState::COMPLETED) {
-    if (receiver.entry_from_key(KEY_REGION)->was_received()) {
-      strncpy_nullterm(cfg.region, buff.region, REGION_MAX_LEN);
+  if (completed) {
+    if (cfg.ntp_host[0] == '\0') {
+      strncpy(cfg.ntp_host, "pool.ntp.org", NTP_HOST_MAX_LEN);
     }
-    if (receiver.entry_from_key(KEY_SSID)->was_received()) {
-      strncpy_nullterm(cfg.ssid, buff.ssid, SSID_MAX_LEN);
+    if (cfg.timezone[0] == '\0') {
+      strncpy(cfg.timezone, "0000", TIMEZONE_MAX_LEN);
     }
-    if (receiver.entry_from_key(KEY_PASSWORD)->was_received()) {
-      strncpy_nullterm(cfg.password, buff.password, PASSWORD_MAX_LEN);
-    }
-    if (receiver.entry_from_key(KEY_NTP_HOST)->was_received()) {
-      strncpy_nullterm(cfg.ntp_host, buff.ntp_host, NTP_HOST_MAX_LEN);
-    }
-    if (receiver.entry_from_key(KEY_TIMEZONE)->was_received()) {
-      strncpy_nullterm(cfg.timezone, buff.timezone, TIMEZONE_MAX_LEN);
-    }
-    NTPC_PRINTF("RX completed successfully\n");
+
+    NTPC_PRINTF("Region  : '%s'\n", cfg.region);
+    NTPC_PRINTF("SSID    : '%s'\n", cfg.ssid);
+    NTPC_PRINTF("Password: '%s'\n", cfg.password);
+    NTPC_PRINTF("NTP Host: '%s'\n", cfg.ntp_host);
+    NTPC_PRINTF("Timezone: '%s'\n", cfg.timezone);
 
     if (eeprom_save(cfg)) {
       NTPC_PRINTF("Config saved to EEPROM\n");
@@ -124,25 +131,10 @@ bool update(Config &cfg, bool *success) {
       NTPC_PRINTF("Failed to save config to EEPROM\n");
     }
 
-    if (success) *success = true;
-
-    return true;
+    *success = true;
   }
 
-  if (ntpc::stdio_inited) {
-    if (cli::update(cfg)) {
-      if (eeprom_save(cfg)) {
-        NTPC_PRINTF("Config saved to EEPROM\n");
-      } else {
-        NTPC_PRINTF("Failed to save config to EEPROM\n");
-      }
-
-      if (success) *success = true;
-      return true;
-    }
-  }
-
-  return false;
+  return completed;
 }
 
 bool is_receiving() {

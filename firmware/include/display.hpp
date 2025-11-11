@@ -12,7 +12,7 @@ namespace display {
 using namespace ntpc;
 
 void init();
-void update_display(Context &ctx, uint64_t tick_ms);
+void update_display(Context &ctx);
 void turn_off();
 
 }  // namespace display
