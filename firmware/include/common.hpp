@@ -27,6 +27,7 @@ struct Context {
   state_t state;
   uint64_t origin_time_ms;
   uint64_t origin_tick_ms;
+  uint64_t last_try_time_ms;
   uint64_t next_sync_tick_ms;
   result_t last_error;
 };

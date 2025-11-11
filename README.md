@@ -88,4 +88,6 @@ The received configuration data is stored in EEPROM.
 > [!WARNING]
 > The light signal and the data in the EEPROM are not encrypted, so be careful not to let someone spy on you watching the flashing or steal your clock.
 
+Once configured, NTP synchronization will occur at a random time between 4:00 and 5:00 every morning..
+
 For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.

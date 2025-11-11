@@ -74,7 +74,6 @@ int main() {
           config::recv_start();
           NTPC_PRINTF("Enter SETUP state\n");
         }
-
         break;
 
       case state_t::SETUP: {
@@ -114,28 +113,34 @@ void sync_with_ntp() {
 
   uint64_t time;
   auto res = ntp::get_time(cfg, &time);
+
+  uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
+  ctx.last_try_time_ms = tick_ms;
+
   if (res != ntp::result_t::SUCCESS) {
     ctx.last_error = res;
-    // 10分後に再試行
-    ctx.next_sync_tick_ms = to_ms_since_boot(get_absolute_time()) + 600 * 1000;
+    // If failed, retry in 10 minutes
+    ctx.next_sync_tick_ms = tick_ms + 600 * 1000;
     NTPC_PRINTF("NTP time fetch failed: %d\n", static_cast<int>(res));
     return;
   }
 
+  // Add timezone offset
   int tz = atoi(cfg.timezone);
   int tz_hour = tz / 100;
   int tz_min = tz % 100;
   time += (uint64_t)(tz_hour * 3600 + tz_min * 60) * 1000;
 
   ctx.origin_time_ms = time;
-  ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
+  ctx.origin_tick_ms = tick_ms;
   ctx.last_error = result_t::SUCCESS;
 
-  // 次の朝5時に同期する
+  // Schedule the next sync between 4 AM and 5 AM the next day
   time_t now_sec = time / 1000;
   struct tm *t = gmtime(&now_sec);
   int time_sec = t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec;
-  int sec_to_next_sync = ((24 + 5) * 3600 - time_sec) % (24 * 3600);
+  int expire_sec = (24 + 4) * 3600 + (rand() % 3600);
+  int sec_to_next_sync = (expire_sec - time_sec) % (24 * 3600);
   ctx.next_sync_tick_ms = ctx.origin_tick_ms + sec_to_next_sync * 1000;
 
   NTPC_PRINTF("NTP time synchronized.\n");

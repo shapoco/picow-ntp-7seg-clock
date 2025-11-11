@@ -73,11 +73,14 @@ static uint64_t transition_start_ms = 0;
 static repeating_timer_t st_timer;
 static int dma_chan;
 
-static void render_clock(uint64_t now_ms);
-static int get_blink_alpha(uint64_t now_ms);
-static void draw_string(const char *s, int start_digit = NUM_DIGITS - 1);
-static void clear_digits();
-static void render_segments(uint8_t alpha);
+static void render_clock(uint64_t time_ms);
+static int get_blink_alpha(uint64_t time_ms);
+static void dram_draw_string(const char *s, uint8_t alpha = 255,
+                             int start_digit = NUM_DIGITS - 1);
+static void dram_draw_char(char c, uint8_t alpha, int idig);
+static void dram_draw_dp(int digit_index, uint8_t alpha = 255);
+static void dram_clear(char c = ' ', uint8_t alpha = 255);
+static void decode_segments(uint8_t alpha = 255);
 static void update_dma_buff();
 static void print_digit(int index, int width, int value);
 
@@ -107,6 +110,8 @@ void init() {
   segment_table['L'] = 0b00111000;
   segment_table['N'] = 0b01010100;
   segment_table['O'] = 0b01011100;
+  segment_table['P'] = 0b01110011;
+  segment_table['T'] = 0b01111000;
   segment_table['R'] = 0b01010000;
   segment_table['-'] = 0b01000000;
 
@@ -117,6 +122,8 @@ void init() {
     gpio_set_drive_strength(port, GPIO_DRIVE_STRENGTH_12MA);
   }
   memset(dma_buff, 0xFF, sizeof(dma_buff));
+
+  turn_off();
 
   uint offset = pio_add_program(pio0, &seg7_pwm_tx_program);
   seg7_pwm_tx_program_init(pio0, 0, offset, SEGMENT_PORT_BASE, PIO_CLKDIV);
@@ -135,74 +142,72 @@ void init() {
 }
 
 void update_display(Context &ctx, uint64_t tick_ms) {
-  const int64_t now_ms = ctx.origin_time_ms + (tick_ms - ctx.origin_tick_ms);
-  const time_t now_sec = (now_ms + FADE_TIME_MS * 2) / 1000;
-  int millisec = now_ms % 1000;
+  const uint64_t time_ms = ctx.origin_time_ms + (tick_ms - ctx.origin_tick_ms);
 
   if (ctx.state == state_t::IDLE) {
-    if (ctx.origin_time_ms == 0) {
+    uint64_t elapsed_ms = tick_ms - ctx.last_try_time_ms;
+    if (ctx.last_error != result_t::SUCCESS && elapsed_ms < 5000) {
+      // エラー表示
+      dram_clear();
+      char msg[16];
+      int err = static_cast<int>(ctx.last_error);
+      snprintf(msg, sizeof(msg), "NTPERR%02X", err);
+      dram_draw_string(msg);
+    } else if (ctx.origin_time_ms == 0) {
       // 時刻未設定
-      memset(digits0, '-', sizeof(digits0));
-      memcpy(digits1, digits0, sizeof(digits0));
-      int alpha = get_blink_alpha(now_ms);
-      render_segments(alpha);
-      dram0[2 * NUM_SEGMENTS + 7] = COLON_COEFF * alpha / 256;
-      dram0[4 * NUM_SEGMENTS + 7] = COLON_COEFF * alpha / 256;
-      dram0[8 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * alpha / 256;
-      dram0[10 * NUM_SEGMENTS + 7] = HYPHEN_COEFF * alpha / 256;
-      memcpy(dram1, dram0, sizeof(dram0));
-      memcpy(dram2, dram0, sizeof(dram0));
+      int alpha = get_blink_alpha(time_ms);
+      dram_clear('-', alpha);
+      dram_draw_dp(10, HYPHEN_COEFF * alpha / 256);
+      dram_draw_dp(8, HYPHEN_COEFF * alpha / 256);
+      dram_draw_dp(4, COLON_COEFF * alpha / 256);
+      dram_draw_dp(2, COLON_COEFF * alpha / 256);
     } else {
       // 通常時刻表示
-      render_clock(now_ms);
+      render_clock(time_ms);
     }
   } else if (ctx.state == state_t::SETUP) {
-    clear_digits();
+    dram_clear();
     if (config::is_receiving()) {
-      draw_string("LOADING");
+      const char *s = "LOADING";
+      for (int i = 0; s[i] != '\0'; i++) {
+        int pos = NUM_DIGITS - 1 - i;
+        uint8_t alpha = get_blink_alpha(time_ms + pos * 100);
+        dram_draw_char(s[i], alpha, pos);
+      }
     } else {
-      draw_string("CONFIG");
+      dram_draw_string("CONFIG", get_blink_alpha(time_ms));
     }
-
-    memcpy(digits1, digits0, sizeof(digits0));
-    render_segments(get_blink_alpha(now_ms));
-
-    memcpy(dram1, dram0, sizeof(dram0));
-    memcpy(dram2, dram0, sizeof(dram0));
   } else if (ctx.state == state_t::VLCFG_ERROR) {
-    clear_digits();
-    auto err = config::last_vlcfg_error();
+    dram_clear();
     char msg[16];
-    snprintf(msg, sizeof(msg), "ERROR %02X", static_cast<int>(err));
-    draw_string(msg);
-
-    memcpy(digits1, digits0, sizeof(digits0));
-
-    render_segments(get_blink_alpha(now_ms));
-    // 受信状態の表示
-    dram0[6 * NUM_SEGMENTS + 7] = config::last_bit() ? 255 : 0;
-
-    memcpy(dram1, dram0, sizeof(dram0));
-    memcpy(dram2, dram0, sizeof(dram0));
+    int err = static_cast<int>(config::last_vlcfg_error());
+    snprintf(msg, sizeof(msg), "CFGERR%02X", err);
+    dram_draw_string(msg);
+    dram_draw_dp(6, config::last_bit() ? 255 : 0);
   }
 
-  // 前回の同期から24時間以上経っていたら右端のドットを点滅
-  if (tick_ms - ctx.origin_tick_ms > 24 * 3600 * 1000) {
-    dram2[0 * NUM_SEGMENTS + 7] = (tick_ms % 1000 < 500) ? 255 : 0;
+  if (tick_ms - ctx.origin_tick_ms > 25 * 3600 * 1000) {
+    // 前回の同期から25時間以上経っていたら右端のドットを点滅
+    uint8_t alpha = (tick_ms % 1000 < 500) ? 255 : 0;
+    dram_draw_dp(0, alpha);
   }
 
   update_dma_buff();
 }
 
 void turn_off() {
+  memset(digits0, 0, sizeof(digits0));
+  memset(digits1, 0, sizeof(digits1));
+  transition_num_digits = NUM_DIGITS;
+  
   memset(dram0, 0, sizeof(dram0));
   memset(dram1, 0, sizeof(dram1));
   memset(dram2, 0, sizeof(dram2));
   memset(dma_buff, 0xFF, sizeof(dma_buff));
 }
 
-static void render_clock(uint64_t now_ms) {
-  time_t now_sec = (now_ms + FADE_TIME_MS * 2) / 1000;
+static void render_clock(uint64_t time_ms) {
+  time_t now_sec = (time_ms + FADE_TIME_MS * 2) / 1000;
   struct tm *t = gmtime(&now_sec);
 
   int sec = t->tm_sec;
@@ -225,20 +230,20 @@ static void render_clock(uint64_t now_ms) {
     for (int idig = NUM_DIGITS - 1; idig >= 0; idig--) {
       if (digits0[idig] != digits1[idig]) {
         transition_num_digits = idig + 1;
-        transition_start_ms = now_ms;
+        transition_start_ms = time_ms;
         break;
       }
     }
     memcpy(digits1, digits0, sizeof(digits0));
 
-    render_segments(255);
+    decode_segments(255);
 
     // 日付のハイフン点灯
     dram0[8 * NUM_SEGMENTS + 7] = HYPHEN_COEFF;
     dram0[10 * NUM_SEGMENTS + 7] = HYPHEN_COEFF;
 
   } else {
-    uint32_t t = now_ms - transition_start_ms;
+    uint32_t t = time_ms - transition_start_ms;
 
     // アニメーション
     for (int idig = 0; idig < NUM_DIGITS; idig++) {
@@ -273,14 +278,14 @@ static void render_clock(uint64_t now_ms) {
   }
 
   // コロンの点滅
-  int alpha = get_blink_alpha(now_ms);
+  int alpha = get_blink_alpha(time_ms);
   dram2[2 * NUM_SEGMENTS + 7] = 128 * alpha / 256;
   dram2[4 * NUM_SEGMENTS + 7] = 128 * alpha / 256;
 }
 
-static int get_blink_alpha(uint64_t now_ms) {
+static int get_blink_alpha(uint64_t time_ms) {
   int alpha;
-  int millisec = now_ms % 1000;
+  int millisec = time_ms % 1000;
   constexpr int FADEIN_MS = 100;
   constexpr int FADEOUT_MS = 500 - FADEIN_MS;
   if (millisec < 500) {
@@ -309,47 +314,53 @@ static void print_digit(int index, int width, int value) {
 static bool repeating_timer_callback(repeating_timer_t *rt) {
   constexpr uint32_t ANODE_PORT_MASK = ((1 << NUM_DIGITS) - 1)
                                        << DIGIT_PORT_BASE;
-#if 0
-  for (int iseg = 0; iseg < NUM_SEGMENTS; iseg++) {
-    uint8_t val = dram[digit_sel * NUM_SEGMENTS + iseg];
-    gpio_put(SEGMENT_PORTS[iseg], val >= 128);
-  }
-  gpio_put_masked(ANODE_PORT_MASK, (1 << digit_sel));
-  digit_sel = (digit_sel + 1) % NUM_DIGITS;
-#else
   if (!dma_channel_is_busy(dma_chan)) {
+    // anode select
     gpio_put_masked(ANODE_PORT_MASK, (1 << digit_sel));
+
+    // kick DMA
     uint8_t *read_addr = dma_buff + (digit_sel * PWM_PERIOD);
-    if (true) {
-      dma_channel_set_read_addr(dma_chan, read_addr, true);
-    } else {
-      dma_channel_config c = dma_channel_get_default_config(dma_chan);
-      channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
-      channel_config_set_write_increment(&c, false);
-      channel_config_set_read_increment(&c, true);
-      channel_config_set_dreq(&c, DREQ_PIO0_TX0);
-      dma_channel_configure(dma_chan, &c, &pio0_hw->txf[0], read_addr,
-                            PWM_PERIOD, true);
-    }
+    dma_channel_set_read_addr(dma_chan, read_addr, true);
     digit_sel = (digit_sel + 1) % NUM_DIGITS;
   }
-#endif
   return true;
 }
 
-static void draw_string(const char *s, int start_digit) {
-  int i = start_digit;
-  while (*s && i >= 0) {
-    digits0[i--] = *s++;
+static void dram_draw_string(const char *s, uint8_t alpha, int start_digit) {
+  int idig = start_digit;
+  while (*s && idig >= 0) {
+    char c = *s;
+    dram_draw_char(c, alpha, idig);
+    idig--;
+    s++;
   }
 }
 
-static void clear_digits() {
-  memset(digits0, ' ', sizeof(digits0));
-  memset(digits1, ' ', sizeof(digits1));
+static void dram_draw_char(char c, uint8_t alpha, int idig) {
+  uint8_t seg_bits = segment_table[(int)c];
+  for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
+    dram2[idig * NUM_SEGMENTS + iseg] = (seg_bits & 1) ? alpha : 0;
+    seg_bits >>= 1;
+  }
 }
 
-static void render_segments(uint8_t alpha) {
+static void dram_draw_dp(int digit_index, uint8_t alpha) {
+  if (digit_index < 0 || digit_index >= NUM_DIGITS) return;
+  dram2[digit_index * NUM_SEGMENTS + 7] = alpha;
+}
+
+static void dram_clear(char c, uint8_t alpha) {
+  uint8_t seg_bits = segment_table[(int)c];
+  for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
+    dram2[iseg] = (seg_bits & 1) ? alpha : 0;
+    seg_bits >>= 1;
+  }
+  for (int idig = 1; idig < NUM_DIGITS; idig++) {
+    memcpy(dram2 + idig * NUM_SEGMENTS, dram2, NUM_SEGMENTS);
+  }
+}
+
+static void decode_segments(uint8_t alpha) {
   for (int idig = 0; idig < NUM_DIGITS; idig++) {
     uint8_t seg_bits = segment_table[(int)digits1[idig]];
     for (int iseg = 0; iseg < NUM_SEGMENTS - 1; iseg++) {
@@ -364,13 +375,8 @@ static void update_dma_buff() {
     uint16_t thresh[NUM_SEGMENTS] = {0};
     for (int s = 0; s < NUM_SEGMENTS; s++) {
       uint32_t val = dram2[d * NUM_SEGMENTS + s];
-#if 0
-        val = val * val * val;
-        val /= (255 * 255 * 255) / (PWM_PERIOD - 1);
-#else
       val = val * val;
       val = val * (PWM_PERIOD - 1) / (255 * 255);
-#endif
       thresh[s] = val;
     }
 
