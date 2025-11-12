@@ -129,7 +129,7 @@ void init() {
 }
 
 void update_display(Context &ctx) {
-    uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
+  uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
   const uint64_t time_ms = ctx.origin_time_ms + (tick_ms - ctx.origin_tick_ms);
 
   if (ctx.state == state_t::IDLE) {
@@ -195,7 +195,7 @@ void turn_off() {
 }
 
 static void render_clock(uint64_t time_ms) {
-  time_t now_sec = (time_ms + FADE_TIME_MS * 2) / 1000;
+  time_t now_sec = (time_ms + FADE_TIME_MS) / 1000;
   struct tm *t = gmtime(&now_sec);
 
   int sec = t->tm_sec;
@@ -282,8 +282,17 @@ static int get_blink_alpha(uint64_t time_ms) {
     alpha = 256 * (FADEOUT_MS - (millisec - 500)) / FADEOUT_MS;
     alpha = alpha * alpha / 256;
   } else {
-    alpha = 256 - (256 * (millisec - (1000 - FADEIN_MS)) / FADEIN_MS);
-    alpha = 256 - (alpha * alpha) / 256;
+  }
+  if (millisec < FADEIN_MS) {
+    alpha = 255 * millisec / FADEIN_MS;
+    alpha = 255 - alpha;
+    alpha = 255 - (alpha * alpha) / 255;
+  } else if (millisec < 1000 - FADEOUT_MS) {
+    alpha = 255;
+  } else {
+    alpha = 255 * (999 - millisec) / FADEOUT_MS;
+    alpha = 255 - alpha;
+    alpha = 255 - (alpha * alpha) / 255;
   }
   if (alpha < 0) alpha = 0;
   if (alpha > 255) alpha = 255;
