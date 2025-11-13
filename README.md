@@ -8,7 +8,7 @@ NTP clock with animated 7-segment display.
 
 |Part|Type|
 |:--|:--|
-|MCU|RaspberryPi Pico2W|
+|Board|RaspberryPi Pico2W|
 |LED|anode common 7-segment LEDs (\*),<br>and same color chip LEDs|
 |EEPROM|[AT24C32E](https://akizukidenshi.com/catalog/g/g115715/)|
 |Light Sensor|[NJL7502L](https://akizukidenshi.com/catalog/g/g102325/)|
