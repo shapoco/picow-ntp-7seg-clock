@@ -68,7 +68,7 @@ static void dram_draw_char(char c, uint8_t alpha, int idig);
 static void dram_draw_dp(int digit_index, uint8_t alpha = 255);
 static void dram_clear(char c = ' ', uint8_t alpha = 255);
 static void decode_segments(uint8_t alpha = 255);
-static void update_dma_buff();
+static void update_dma_buff(uint16_t brightness);
 static void print_digit(int index, int width, int value);
 
 static bool repeating_timer_callback(repeating_timer_t *rt);
@@ -180,7 +180,11 @@ void update_display(Context &ctx) {
     dram_draw_dp(0, alpha);
   }
 
-  update_dma_buff();
+  uint16_t brightness = 256;
+  if (ctx.state == state_t::IDLE) {
+    brightness = ctx.brightness;
+  }
+  update_dma_buff(brightness);
 }
 
 void turn_off() {
@@ -367,13 +371,16 @@ static void decode_segments(uint8_t alpha) {
   }
 }
 
-static void update_dma_buff() {
+static void update_dma_buff(uint16_t brightness) {
   for (int d = 0; d < NUM_DIGITS; d++) {
     uint16_t thresh[NUM_SEGMENTS] = {0};
     for (int s = 0; s < NUM_SEGMENTS; s++) {
       uint32_t val = dram2[d * NUM_SEGMENTS + s];
+      val = val * brightness;
+      val >>= 8;
       val = val * val;
-      val = val * (PWM_PERIOD - 1) / (255 * 255);
+      val = val * (PWM_PERIOD - 1);
+      val >>= 16;
       thresh[s] = val;
     }
 

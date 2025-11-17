@@ -5,16 +5,8 @@ namespace config {
 
 using namespace ntpc;
 
-// AT24C32E
-// https://akizukidenshi.com/catalog/g/g115715/
-static constexpr int I2C_HOST = 1;
-static constexpr int I2C_FREQ_HZ = 400000;
-static constexpr int SDA_PORT = 26;
-static constexpr int SCL_PORT = 27;
 static constexpr int PAGE_SIZE = 32;
 static constexpr int MEMORY_SIZE = 1024 * 4;
-
-static constexpr int LIGHT_SENSOR_ADC_CH = 2;
 
 static constexpr eeprom::addr_t OFFSET_REGION = 0;
 static constexpr eeprom::addr_t OFFSET_SSID = OFFSET_REGION + REGION_MAX_LEN;
@@ -61,9 +53,6 @@ static uint32_t calc_crc32(const uint8_t *data, size_t length);
   } while (0)
 
 bool init(Config &cfg) {
-  adc_init();
-  adc_gpio_init(26 + LIGHT_SENSOR_ADC_CH);
-  adc_select_input(LIGHT_SENSOR_ADC_CH);
   NTPC_PRINTF("Initializing EEPROM...\n");
   rom.init();
   NTPC_PRINTF("Loading config from EEPROM...\n");
@@ -95,7 +84,7 @@ bool update(Config &cfg, bool *success) {
     t_next_sensor_read_ms += 10;
 
     vlcfg::RxState rx_state;
-    vlcfg_err = receiver.update(adc_read(), &rx_state);
+    vlcfg_err = receiver.update(brightness::read_adc(), &rx_state);
     if (vlcfg_err != vlcfg::Result::SUCCESS ||
         rx_state == vlcfg::RxState::ERROR) {
       NTPC_PRINTF("RX error: %d\n", static_cast<int>(vlcfg_err));

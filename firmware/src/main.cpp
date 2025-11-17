@@ -8,12 +8,14 @@
 
 #include <vlcfg/vlconfig.hpp>
 
+#include "brightness.hpp"
 #include "button.hpp"
 #include "common.hpp"
 #include "config.hpp"
 #include "display.hpp"
 #include "eeprom.hpp"
 #include "ntp_client.hpp"
+#include "rx8025nb.hpp"
 
 using namespace ntpc;
 
@@ -24,7 +26,13 @@ Context ctx;
 Button setup_button(SETUP_SW_PORT);
 
 config::Config cfg;
+rx8025nb::Driver rtc(I2C_HOST, SDA_PORT, SCL_PORT);
 
+uint64_t t_next_button_update_ms = 0;
+uint64_t t_next_display_update_ms = 0;
+
+void i2c_reset();
+void sync_from_rtc();
 void sync_with_ntp();
 
 int main() {
@@ -41,16 +49,26 @@ int main() {
   ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
   ctx.next_sync_tick_ms = 0;
   ctx.last_error = result_t::SUCCESS;
+  ctx.brightness = 256;
 
   display::init();
-
+  brightness::init();
   setup_button.init();
+
+  i2c_reset();
+
+  {
+    rx8025nb::result_t res = rtc.init();
+    if (res == rx8025nb::result_t::SUCCESS) {
+      sync_from_rtc();
+    } else {
+      ctx.last_error = result_t::RTC_INIT_FAILED;
+      NTPC_PRINTF("RTC init failed.\r\n");
+    }
+  }
 
   ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
   config::init(cfg);
-
-  uint64_t t_next_button_update_ms = 0;
-  uint64_t t_next_display_update_ms = 0;
 
   while (true) {
     const uint64_t tick_ms = to_ms_since_boot(get_absolute_time());
@@ -66,7 +84,8 @@ int main() {
     }
 
     switch (ctx.state) {
-      case state_t::IDLE:
+      case state_t::IDLE: {
+        brightness::update(ctx, tick_ms);
         if (tick_ms >= ctx.next_sync_tick_ms) {
           sync_with_ntp();
         } else if (setup_button.on_clicked()) {
@@ -74,7 +93,7 @@ int main() {
           ctx.state = state_t::SETUP;
           config::start(cfg);
         }
-        break;
+      } break;
 
       case state_t::SETUP: {
         bool success = false;
@@ -106,6 +125,30 @@ int main() {
   }
 
   return 0;
+}
+
+void i2c_reset() {
+  i2c_init(I2C_HOST ? i2c1 : i2c0, I2C_FREQ_HZ);
+  gpio_init(SDA_PORT);
+  gpio_init(SCL_PORT);
+  gpio_pull_up(SDA_PORT);
+  gpio_pull_up(SCL_PORT);
+  gpio_set_function(SDA_PORT, GPIO_FUNC_I2C);
+  gpio_set_function(SCL_PORT, GPIO_FUNC_I2C);
+}
+
+void sync_from_rtc() {
+  uint64_t time_sec;
+  rx8025nb::result_t res = rtc.get_time(&time_sec);
+  if (res != rx8025nb::result_t::SUCCESS) {
+    ctx.last_error = result_t::RTC_READ_FAILED;
+    NTPC_PRINTF("RTC time fetch failed: %d\n", static_cast<int>(res));
+    return;
+  }
+  uint64_t time_ms = time_sec * 1000;
+
+  ctx.origin_time_ms = time_ms;
+  ctx.origin_tick_ms = to_ms_since_boot(get_absolute_time());
 }
 
 void sync_with_ntp() {
@@ -142,6 +185,14 @@ void sync_with_ntp() {
   int expire_sec = (24 + 4) * 3600 + (rand() % 3600);
   int sec_to_next_sync = (expire_sec - time_sec) % (24 * 3600);
   ctx.next_sync_tick_ms = ctx.origin_tick_ms + sec_to_next_sync * 1000;
+
+  {
+    rx8025nb::result_t res = rtc.set_time(time / 1000);
+    if (res != rx8025nb::result_t::SUCCESS) {
+      ctx.last_error = result_t::RTC_WRITE_FAILED;
+      NTPC_PRINTF("RTC time set failed: %d\n", static_cast<int>(res));
+    }
+  }
 
   NTPC_PRINTF("NTP time synchronized.\n");
 }

@@ -2,6 +2,7 @@
 #define NTP_CLOCK_COMMON_HPP
 
 #include <cstdint>
+#include <cstdio>
 
 namespace ntpc {
 
@@ -10,6 +11,15 @@ static constexpr int SSID_MAX_LEN = 32;
 static constexpr int PASSWORD_MAX_LEN = 32;
 static constexpr int NTP_HOST_MAX_LEN = 128;
 static constexpr int TIMEZONE_MAX_LEN = 8;
+
+// AT24C32E
+// https://akizukidenshi.com/catalog/g/g115715/
+static constexpr int I2C_HOST = 1;
+static constexpr int I2C_FREQ_HZ = 400000;
+static constexpr int SDA_PORT = 26;
+static constexpr int SCL_PORT = 27;
+
+static constexpr int LIGHT_SENSOR_ADC_CH = 2;
 
 enum class state_t {
   IDLE,
@@ -27,6 +37,9 @@ enum class result_t {
   DNS_TIMEOUT,
   NTP_FAILED,
   NTP_TIMEOUT,
+  RTC_INIT_FAILED,
+  RTC_READ_FAILED,
+  RTC_WRITE_FAILED,
 };
 
 struct Context {
@@ -36,6 +49,7 @@ struct Context {
   uint64_t last_try_time_ms;
   uint64_t next_sync_tick_ms;
   result_t last_error;
+  uint16_t brightness;
 };
 
 struct Config {

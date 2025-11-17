@@ -1,7 +1,6 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
-#include <hardware/adc.h>
 #include <pico/stdlib.h>
 
 #include <cstdint>
@@ -9,6 +8,7 @@
 
 #include "common.hpp"
 #include "eeprom.hpp"
+#include "brightness.hpp"
 
 #include <vlcfg/vlconfig.hpp>
 

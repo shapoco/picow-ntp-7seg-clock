@@ -11,9 +11,11 @@ NTP clock with animated 7-segment display.
 |Board|RaspberryPi Pico2W|
 |LED|anode common 7-segment LEDs (\*),<br>and same color chip LEDs|
 |EEPROM|[AT24C32E](https://akizukidenshi.com/catalog/g/g115715/)|
+|RTC|[RX-8025NB](https://akizukidenshi.com/catalog/g/g108585/)|
 |Light Sensor|[NJL7502L](https://akizukidenshi.com/catalog/g/g102325/)|
 |Switch|tactile switch|
-|Others|some resistors and capacitors|
+|Battery|CR2032|
+|Others|some resistors/capacitors/diodes|
 
 (\*) I used `SS512UWWB`, which I bought at a local parts store, but I couldn't find its datasheet.
 
@@ -53,8 +55,8 @@ NTP clock with animated 7-segment display.
 |GP21|Segment 'b'|
 |GP22|Setup Switch|
 |RUN|Reset Switch|
-|GP26 (i2c1_sda)|EEPROM|
-|GP27 (i2c1_scl)|EEPROM|
+|GP26 (i2c1_sda)|EEPROM / RTC|
+|GP27 (i2c1_scl)|EEPROM / RTC|
 |GP28 (ADC2)|Light Sensor|
 
 ## Building Firmware
@@ -100,3 +102,11 @@ The received configuration data is stored in EEPROM.
 Once configured, NTP synchronization will occur at a random time between 4:00 and 5:00 every morning.
 
 For more information about the configuration interface, see the [VLConfig](https://github.com/shapoco/vlconfig) repository.
+
+## Brightness Calibration
+
+1. Place the clock in the desired location.
+2. Turn on the power or press the reset switch.
+3. Turn the room lights on for 30 seconds, then off for 30 seconds.
+
+The clock will remember the difference in brightness and automatically adjust the display brightness from then on.

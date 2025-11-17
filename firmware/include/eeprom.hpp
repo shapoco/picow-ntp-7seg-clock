@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include "common.hpp"
+
 namespace eeprom {
 
 enum class result_t {
@@ -41,15 +43,7 @@ class Driver {
         clock_hz(clock_hz),
         write_cycle_time_ms(write_cycle_time_ms) {}
 
-  void init() {
-    i2c_init(i2c, clock_hz);
-    gpio_init(sda_port);
-    gpio_init(scl_port);
-    gpio_pull_up(sda_port);
-    gpio_pull_up(scl_port);
-    gpio_set_function(sda_port, GPIO_FUNC_I2C);
-    gpio_set_function(scl_port, GPIO_FUNC_I2C);
-  }
+  void init() {}
 
   result_t read_data(addr_t mem_addr, uint8_t* buffer, addr_t length) {
     if (mem_addr + length > size_bytes) {
@@ -75,16 +69,16 @@ class Driver {
     }
 
     if (ntpc::stdio_inited) {
-    NTPC_PRINTF("EEPROM read successful: addr=0x%04lX, length=%lu\n", mem_addr,
-                length);
-    for (addr_t i = 0; i < length; i++) {
-      if (i % 16 == 0) {
-        printf("\n0x%04lX: ", mem_addr + i);
+      NTPC_PRINTF("EEPROM read successful: addr=0x%04lX, length=%lu\n",
+                  mem_addr, length);
+      for (addr_t i = 0; i < length; i++) {
+        if (i % 16 == 0) {
+          printf("\n0x%04lX: ", mem_addr + i);
+        }
+        printf("%02X ", buffer[i]);
       }
-      printf("%02X ", buffer[i]);
+      printf("\n");
     }
-    printf("\n");
-  }
 
     return result_t::SUCCESS;
   }
