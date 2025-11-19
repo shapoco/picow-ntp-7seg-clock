@@ -106,12 +106,12 @@ class Driver {
     uint8_t control2 = 0;
     res = read_reg(reg_t::CONTROL_2, &control2);
     if (res != result_t::SUCCESS) {
-      NTPC_PRINTF("RTC init failed.\r\n");
+      NTPC_VERBOSE("RTC init failed.\r\n");
       return res;
     }
 
     if ((control2 & MASK_CONTROL2_PON) != 0) {
-      NTPC_PRINTF("RTC power-on detected, initializing registers.\r\n");
+      NTPC_VERBOSE("RTC power-on detected, initializing registers.\r\n");
       // Power-on sequence
       int init_len = sizeof(INIT_SEQUENCE) / sizeof(INIT_SEQUENCE[0]);
       for (int i = 0; i < init_len; i += 2) {
@@ -119,14 +119,14 @@ class Driver {
         uint8_t value = INIT_SEQUENCE[i + 1];
         res = write_reg(reg, &value);
         if (res != result_t::SUCCESS) {
-          NTPC_PRINTF("RTC write_reg failed: reg=0x%02X, value=0x%02X\n",
-                      static_cast<uint8_t>(reg), value);
+          NTPC_VERBOSE("RTC write_reg failed: reg=0x%02X, value=0x%02X\n",
+                       static_cast<uint8_t>(reg), value);
           return res;
         }
       }
     }
 
-    NTPC_PRINTF("RTC initialized\n");
+    NTPC_VERBOSE("RTC initialized\n");
 
     return result_t::SUCCESS;
   }
@@ -137,7 +137,7 @@ class Driver {
     uint8_t bcd[size];
     result_t res = read_reg(reg_t::SECONDS, bcd, size);
     if (res != result_t::SUCCESS) {
-      NTPC_PRINTF("RTC get_time read_reg failed\n");
+      NTPC_VERBOSE("RTC get_time read_reg failed\n");
       return res;
     }
 
@@ -150,9 +150,9 @@ class Driver {
     t.tm_year = from_bcd(bcd[6], 0xFF) + 100;
     t.tm_isdst = -1;
 
-    NTPC_PRINTF("RTC time fetched: %04d-%02d-%02d %02d:%02d:%02d\n",
-                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min,
-                t.tm_sec);
+    NTPC_VERBOSE("RTC time fetched: %04d-%02d-%02d %02d:%02d:%02d\n",
+                 t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min,
+                 t.tm_sec);
 
     time_t epoch_time = mktime(&t);
     *time = static_cast<uint64_t>(epoch_time);
@@ -175,13 +175,13 @@ class Driver {
 
     result_t res = write_reg(reg_t::SECONDS, bcd, size);
     if (res != result_t::SUCCESS) {
-      NTPC_PRINTF("RTC set_time write_reg failed\n");
+      NTPC_VERBOSE("RTC set_time write_reg failed\n");
       return res;
     }
 
-    NTPC_PRINTF("RTC time set to %04d-%02d-%02d %02d:%02d:%02d\n",
-                t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour,
-                t->tm_min, t->tm_sec);
+    NTPC_VERBOSE("RTC time set to %04d-%02d-%02d %02d:%02d:%02d\n",
+                 t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour,
+                 t->tm_min, t->tm_sec);
     return result_t::SUCCESS;
   }
 
@@ -193,7 +193,7 @@ class Driver {
     ret = i2c_write_blocking(i2c, dev_addr, buf, 1 + size, false);
     sleep_us(I2C_INTERVAL_US);
     if (ret != 1 + size) {
-      NTPC_PRINTF(
+      NTPC_VERBOSE(
           "RTC write_reg i2c_write_blocking failed: addr=0x%02X, ret=%d\n",
           static_cast<int>(addr), ret);
       return result_t::I2C_ACCESS_FAILED;
@@ -207,7 +207,7 @@ class Driver {
     ret = i2c_write_blocking(i2c, dev_addr, &reg, 1, true);
     sleep_us(I2C_INTERVAL_US);
     if (ret != 1) {
-      NTPC_PRINTF(
+      NTPC_VERBOSE(
           "RTC read_reg i2c_write_blocking failed: addr=0x%02X, ret=%d\n",
           static_cast<int>(addr), ret);
       return result_t::I2C_ACCESS_FAILED;
@@ -215,7 +215,7 @@ class Driver {
     ret = i2c_read_blocking(i2c, dev_addr, value, size, false);
     sleep_us(I2C_INTERVAL_US);
     if (ret != size) {
-      NTPC_PRINTF(
+      NTPC_VERBOSE(
           "RTC read_reg i2c_read_blocking failed: addr=0x%02X, ret=%d\n",
           static_cast<int>(addr), ret);
       return result_t::I2C_ACCESS_FAILED;

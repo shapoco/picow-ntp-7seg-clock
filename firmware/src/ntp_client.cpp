@@ -41,7 +41,7 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 
 result_t get_time(const config::Config &cfg, uint64_t *out_time) {
   if (!out_time) {
-    NTPC_PRINTF("NTP client: NULL pointer for output time\n");
+    NTPC_VERBOSE("NTP client: NULL pointer for output time\n");
     return result_t::NULL_POINTER;
   }
 
@@ -58,7 +58,8 @@ result_t get_time(const config::Config &cfg, uint64_t *out_time) {
   }
 
   {
-    NTPC_PRINTF("Initializing CYW43 arch with country code 0x%08lX\n", country);
+    NTPC_VERBOSE("Initializing CYW43 arch with country code 0x%08lX\n",
+                 country);
     int err;
     if (country) {
       err = cyw43_arch_init_with_country(country);
@@ -66,7 +67,7 @@ result_t get_time(const config::Config &cfg, uint64_t *out_time) {
       err = cyw43_arch_init();
     }
     if (err != 0) {
-      NTPC_PRINTF("NTP client: ARCH init failed\n");
+      NTPC_VERBOSE("NTP client: ARCH init failed\n");
       ret = result_t::LWIP_ARCH_INIT_FAILED;
       goto init_failed;
     }
@@ -76,30 +77,30 @@ result_t get_time(const config::Config &cfg, uint64_t *out_time) {
 
   cyw43_arch_enable_sta_mode();
 
-  NTPC_PRINTF("NTP client: Connecting to WiFi SSID='%s'\n", cfg.ssid);
+  NTPC_VERBOSE("NTP client: Connecting to WiFi SSID='%s'\n", cfg.ssid);
   if (cyw43_arch_wifi_connect_timeout_ms(cfg.ssid, cfg.password,
                                          CYW43_AUTH_WPA2_AES_PSK, 30000)) {
-    NTPC_PRINTF("NTP client: WiFi connect failed\n");
+    NTPC_VERBOSE("NTP client: WiFi connect failed\n");
     ret = result_t::LWIP_WIFI_CONNECT_FAILED;
     goto connect_failed;
   }
-  NTPC_PRINTF("NTP client: WiFi connected\n");
+  NTPC_VERBOSE("NTP client: WiFi connected\n");
 
   ret = dns_solve(cfg.ntp_host, &addr);
   if (ret != result_t::SUCCESS) {
-    NTPC_PRINTF("NTP client: DNS resolution failed\n");
+    NTPC_VERBOSE("NTP client: DNS resolution failed\n");
     goto dns_failed;
   }
-  NTPC_PRINTF("NTP client: Resolved NTP server %s to %s\n", cfg.ntp_host,
-              ipaddr_ntoa(&addr));
+  NTPC_VERBOSE("NTP client: Resolved NTP server %s to %s\n", cfg.ntp_host,
+               ipaddr_ntoa(&addr));
 
   ret = ntp_request(addr, out_time);
   if (ret != result_t::SUCCESS) {
-    NTPC_PRINTF("NTP client: NTP request failed\n");
+    NTPC_VERBOSE("NTP client: NTP request failed\n");
     goto ntp_failed;
   }
-  NTPC_PRINTF("NTP client: NTP time received: %llu ms since epoch\n",
-              *out_time);
+  NTPC_VERBOSE("NTP client: NTP time received: %llu ms since epoch\n",
+               *out_time);
 
 ntp_failed:
 dns_failed:
@@ -129,7 +130,7 @@ static result_t dns_solve(const char *host_name, ip_addr_t *addr) {
       cyw43_arch_poll();
       auto diff = absolute_time_diff_us(start, get_absolute_time()) / 1000;
       if (diff >= TIMEOUT_MS) {
-        NTPC_PRINTF("NTP client: DNS resolution timed out\n");
+        NTPC_VERBOSE("NTP client: DNS resolution timed out\n");
         return result_t::DNS_TIMEOUT;
       }
     }
@@ -147,8 +148,8 @@ static result_t dns_solve(const char *host_name, ip_addr_t *addr) {
 static void dns_found(const char *name, const ip_addr_t *addr, void *arg) {
   DnsContext &ctx = *(DnsContext *)arg;
 
-  NTPC_PRINTF("NTP client: dns_found called: name=%s, addr=%s\n", name,
-              addr ? ipaddr_ntoa(addr) : "null");
+  NTPC_VERBOSE("NTP client: dns_found called: name=%s, addr=%s\n", name,
+               addr ? ipaddr_ntoa(addr) : "null");
 
   ctx.called_back = true;
   ctx.success = !!addr;
@@ -183,7 +184,7 @@ static result_t ntp_request(const ip_addr_t addr, uint64_t *result) {
 
     struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_REQ_SIZE, PBUF_RAM);
     if (!p) {
-      NTPC_PRINTF("NTP client: pbuf_alloc failed\n");
+      NTPC_VERBOSE("NTP client: pbuf_alloc failed\n");
       ret = result_t::NTP_FAILED;
       goto fatal;
     }
@@ -194,7 +195,7 @@ static result_t ntp_request(const ip_addr_t addr, uint64_t *result) {
     // req[0] = 0x23;
     err_t err = udp_sendto(ntp_pcb, p, &addr, PORT);
     if (err != ERR_OK) {
-      NTPC_PRINTF("NTP client: udp_sendto failed: %d\n", err);
+      NTPC_VERBOSE("NTP client: udp_sendto failed: %d\n", err);
       pbuf_free(p);
       ret = result_t::NTP_FAILED;
       goto send_failed;
@@ -206,7 +207,7 @@ static result_t ntp_request(const ip_addr_t addr, uint64_t *result) {
       cyw43_arch_poll();
       auto diff = absolute_time_diff_us(start, get_absolute_time()) / 1000;
       if (diff >= TIMEOUT_MS) {
-        NTPC_PRINTF("NTP client: NTP request timed out\n");
+        NTPC_VERBOSE("NTP client: NTP request timed out\n");
         ret = result_t::NTP_TIMEOUT;
         goto send_failed;
       }
@@ -234,7 +235,7 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
   uint8_t mode = pbuf_get_at(p, 0) & 0x7;
   uint8_t stratum = pbuf_get_at(p, 1);
 
-  NTPC_PRINTF(
+  NTPC_VERBOSE(
       "NTP client: ntp_recv called: port=%u, len=%u, mode=%u, stratum=%u\n",
       port, p->tot_len, mode, stratum);
 

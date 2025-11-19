@@ -7,12 +7,6 @@
 
 namespace ntpc::brightness {
 
-enum State {
-  INTERVAL_SEC,
-  INTERVAL_MIN,
-  INTERVAL_HOUR,
-};
-
 static constexpr int SMOOTH_PERIOD = 64;
 static constexpr int SMOOTH_INTERVAL_MS = 15 * 1000 / SMOOTH_PERIOD;
 static constexpr int STARTUP_PERIOD = 60 * 1000 / SMOOTH_INTERVAL_MS;
@@ -38,14 +32,12 @@ static int hourly_index = 0;
 static int hourly_filled = 0;
 static uint16_t hourly_min = 65535;
 static uint16_t hourly_max = 0;
+static uint64_t t_next_hour_ms = 3600 * 1000;
 #endif
 
 static float brightness = 256;
 
-static State state = INTERVAL_SEC;
-
 static uint64_t t_next_smooth_ms = 0;
-static uint64_t t_next_hour_ms = 3600 * 1000;
 static uint64_t t_next_brightness_update_ms = 0;
 
 static uint16_t log2u16(uint16_t x);
@@ -78,10 +70,12 @@ void update(Context &ctx, uint64_t tick_ms) {
       if (startup_index >= STARTUP_PERIOD) {
         std::sort(startup_log, startup_log + STARTUP_PERIOD);
         startup_max = startup_log[STARTUP_PERIOD * 5 / 6];
+        NTPC_VERBOSE("Brightness range: max=%d\r\n", startup_max);
       }
     }
     if (smooth_value < startup_min) {
       startup_min = smooth_value;
+      NTPC_VERBOSE("Brightness range: min=%d\r\n", startup_min);
     }
 
 #if HOURLY_LOG

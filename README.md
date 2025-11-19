@@ -107,9 +107,14 @@ For more information about the configuration interface, see the [VLConfig](https
 
 The clock learns changes in the room's brightness to determine the display brightness. The maximum brightness is learned within one minute after startup, and the minimum brightness is learned over time.
 
-To calibrate your display brightness, follow these steps:
+To calibrate the display brightness, follow these steps:
 
 1. Place the clock in the desired location.
 2. Turn on the power or press the reset switch.
 3. Turn the room lights on for 30 seconds
 4. Turn the room lights off or shield the light sensor for 30 seconds.
+
+## Debug Mode
+
+Press the reset switch while holding down the setup button to enter debug mode, in which trace information is displayed on the UART.
+

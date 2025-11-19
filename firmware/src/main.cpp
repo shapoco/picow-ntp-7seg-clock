@@ -39,10 +39,18 @@ int main() {
   set_sys_clock_khz(SYSTEM_CLOCK_HZ / 1000, true);
   sleep_ms(100);
 
-  stdio_inited = stdio_init_all();
+  bool stdio_inited = stdio_init_all();
   sleep_ms(500);
 
-  NTPC_PRINTF("Hello.\r\n");
+  setup_button.init();
+  debug_mode = stdio_inited && setup_button.is_down();
+  if (debug_mode) {
+    do {
+      sleep_ms(1);
+      setup_button.update(true);
+    } while (setup_button.is_down());
+    NTPC_VERBOSE("Verbose mode enabled.\r\n");
+  }
 
   ctx.state = state_t::IDLE;
   ctx.origin_time_ms = 0;
@@ -53,7 +61,6 @@ int main() {
 
   display::init();
   brightness::init();
-  setup_button.init();
 
   i2c_reset();
 
@@ -63,7 +70,7 @@ int main() {
       sync_from_rtc();
     } else {
       ctx.last_error = result_t::RTC_INIT_FAILED;
-      NTPC_PRINTF("RTC init failed.\r\n");
+      NTPC_VERBOSE("RTC init failed.\r\n");
     }
   }
 
@@ -80,7 +87,7 @@ int main() {
     setup_button.update(pulse_1ms);
 
     if (setup_button.on_clicked()) {
-      NTPC_PRINTF("Setup button clicked\r\n");
+      NTPC_VERBOSE("Setup button clicked\r\n");
     }
 
     switch (ctx.state) {
@@ -89,7 +96,7 @@ int main() {
         if (tick_ms >= ctx.next_sync_tick_ms) {
           sync_with_ntp();
         } else if (setup_button.on_clicked()) {
-          NTPC_PRINTF("Enter SETUP state\n");
+          NTPC_VERBOSE("Enter SETUP state\n");
           ctx.state = state_t::SETUP;
           config::start(cfg);
         }
@@ -106,14 +113,14 @@ int main() {
           }
         } else if (setup_button.on_clicked()) {
           ctx.state = state_t::IDLE;
-          NTPC_PRINTF("Return to IDLE state\n");
+          NTPC_VERBOSE("Return to IDLE state\n");
         }
       } break;
 
       case state_t::VLCFG_ERROR:
         if (setup_button.on_clicked()) {
           ctx.state = state_t::IDLE;
-          NTPC_PRINTF("Return to IDLE state\n");
+          NTPC_VERBOSE("Return to IDLE state\n");
         }
         break;
     }
@@ -142,7 +149,7 @@ void sync_from_rtc() {
   rx8025nb::result_t res = rtc.get_time(&time_sec);
   if (res != rx8025nb::result_t::SUCCESS) {
     ctx.last_error = result_t::RTC_READ_FAILED;
-    NTPC_PRINTF("RTC time fetch failed: %d\n", static_cast<int>(res));
+    NTPC_VERBOSE("RTC time fetch failed: %d\n", static_cast<int>(res));
     return;
   }
   uint64_t time_ms = time_sec * 1000;
@@ -164,7 +171,7 @@ void sync_with_ntp() {
     ctx.last_error = res;
     // If failed, retry in 10 minutes
     ctx.next_sync_tick_ms = tick_ms + 600 * 1000;
-    NTPC_PRINTF("NTP time fetch failed: %d\n", static_cast<int>(res));
+    NTPC_VERBOSE("NTP time fetch failed: %d\n", static_cast<int>(res));
     return;
   }
 
@@ -190,9 +197,9 @@ void sync_with_ntp() {
     rx8025nb::result_t res = rtc.set_time(time / 1000);
     if (res != rx8025nb::result_t::SUCCESS) {
       ctx.last_error = result_t::RTC_WRITE_FAILED;
-      NTPC_PRINTF("RTC time set failed: %d\n", static_cast<int>(res));
+      NTPC_VERBOSE("RTC time set failed: %d\n", static_cast<int>(res));
     }
   }
 
-  NTPC_PRINTF("NTP time synchronized.\n");
+  NTPC_VERBOSE("NTP time synchronized.\n");
 }

@@ -35,7 +35,7 @@ static void input_init();
 static bool input_accept();
 
 void start(Config &cfg) {
-  if (!ntpc::stdio_inited) return;
+  if (!ntpc::debug_mode) return;
 
   buff = cfg;
   buff.password[0] = '\0';
@@ -49,7 +49,7 @@ void start(Config &cfg) {
 }
 
 bool update(Config &cfg) {
-  if (!ntpc::stdio_inited) return false;
+  if (!ntpc::debug_mode) return false;
 
   if (entry_index < NUM_ENTRIES && input_accept()) {
     entry_index++;

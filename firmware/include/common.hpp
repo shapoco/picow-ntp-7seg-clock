@@ -62,10 +62,10 @@ struct Config {
 
 static constexpr int SYSTEM_CLOCK_HZ = 125000000;
 
-extern bool stdio_inited;
-#define NTPC_PRINTF(...)                           \
+extern bool debug_mode;
+#define NTPC_VERBOSE(...)                          \
   do {                                             \
-    if (ntpc::stdio_inited) {                      \
+    if (ntpc::debug_mode) {                        \
       printf("[%s:%d] ", __FILE_NAME__, __LINE__); \
       printf(__VA_ARGS__);                         \
     }                                              \

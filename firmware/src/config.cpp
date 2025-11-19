@@ -53,9 +53,9 @@ static uint32_t calc_crc32(const uint8_t *data, size_t length);
   } while (0)
 
 bool init(Config &cfg) {
-  NTPC_PRINTF("Initializing EEPROM...\n");
+  NTPC_VERBOSE("Initializing EEPROM...\n");
   rom.init();
-  NTPC_PRINTF("Loading config from EEPROM...\n");
+  NTPC_VERBOSE("Loading config from EEPROM...\n");
   return eeprom_load(cfg);
 }
 
@@ -69,7 +69,7 @@ void start(Config &cfg) {
   const uint64_t now_ms = to_ms_since_boot(get_absolute_time());
   t_next_sensor_read_ms = now_ms + 10;
 
-  if (ntpc::stdio_inited) {
+  if (ntpc::debug_mode) {
     cli::start(cfg);
   }
 }
@@ -87,16 +87,16 @@ bool update(Config &cfg, bool *success) {
     vlcfg_err = receiver.update(brightness::read_adc(), &rx_state);
     if (vlcfg_err != vlcfg::Result::SUCCESS ||
         rx_state == vlcfg::RxState::ERROR) {
-      NTPC_PRINTF("RX error: %d\n", static_cast<int>(vlcfg_err));
+      NTPC_VERBOSE("RX error: %d\n", static_cast<int>(vlcfg_err));
       return true;
     } else if (rx_state == vlcfg::RxState::COMPLETED) {
       cfg = buff;
-      NTPC_PRINTF("RX completed successfully\n");
+      NTPC_VERBOSE("RX completed successfully\n");
       completed = true;
     }
   }
 
-  if (!completed && ntpc::stdio_inited) {
+  if (!completed && ntpc::debug_mode) {
     completed |= cli::update(cfg);
   }
 
@@ -108,16 +108,16 @@ bool update(Config &cfg, bool *success) {
       strncpy(cfg.timezone, "0000", TIMEZONE_MAX_LEN);
     }
 
-    NTPC_PRINTF("Region  : '%s'\n", cfg.region);
-    NTPC_PRINTF("SSID    : '%s'\n", cfg.ssid);
-    NTPC_PRINTF("Password: '%s'\n", cfg.password);
-    NTPC_PRINTF("NTP Host: '%s'\n", cfg.ntp_host);
-    NTPC_PRINTF("Timezone: '%s'\n", cfg.timezone);
+    NTPC_VERBOSE("Region  : '%s'\n", cfg.region);
+    NTPC_VERBOSE("SSID    : '%s'\n", cfg.ssid);
+    NTPC_VERBOSE("Password: '%s'\n", cfg.password);
+    NTPC_VERBOSE("NTP Host: '%s'\n", cfg.ntp_host);
+    NTPC_VERBOSE("Timezone: '%s'\n", cfg.timezone);
 
     if (eeprom_save(cfg)) {
-      NTPC_PRINTF("Config saved to EEPROM\n");
+      NTPC_VERBOSE("Config saved to EEPROM\n");
     } else {
-      NTPC_PRINTF("Failed to save config to EEPROM\n");
+      NTPC_VERBOSE("Failed to save config to EEPROM\n");
     }
 
     *success = true;
@@ -139,7 +139,7 @@ static bool eeprom_load(Config &cfg) {
   uint8_t *buff = new uint8_t[EEPROM_CONFIG_SIZE];
 
   if (rom.read_data(0, buff, EEPROM_CONFIG_SIZE) != eeprom::result_t::SUCCESS) {
-    NTPC_PRINTF("Failed to read config from EEPROM\n");
+    NTPC_VERBOSE("Failed to read config from EEPROM\n");
     goto failed;
   }
 
@@ -150,8 +150,8 @@ static bool eeprom_load(Config &cfg) {
                           ((uint32_t)(buff[OFFSET_CRC + 3]) << 24);
     uint32_t calc_crc = calc_crc32(buff, OFFSET_CRC);
     if (stored_crc != calc_crc) {
-      NTPC_PRINTF("EEPROM config CRC mismatch: stored=0x%08lX, calc=0x%08lX\n",
-                  stored_crc, calc_crc);
+      NTPC_VERBOSE("EEPROM config CRC mismatch: stored=0x%08lX, calc=0x%08lX\n",
+                   stored_crc, calc_crc);
       goto failed;
     }
   }
@@ -187,7 +187,7 @@ static bool eeprom_save(const Config &cfg) {
 
   if (rom.write_data(0, buff, EEPROM_CONFIG_SIZE) !=
       eeprom::result_t::SUCCESS) {
-    NTPC_PRINTF("Failed to write config to EEPROM\n");
+    NTPC_VERBOSE("Failed to write config to EEPROM\n");
     goto failed;
   }
   success = true;

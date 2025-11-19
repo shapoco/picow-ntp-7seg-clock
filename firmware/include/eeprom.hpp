@@ -47,8 +47,8 @@ class Driver {
 
   result_t read_data(addr_t mem_addr, uint8_t* buffer, addr_t length) {
     if (mem_addr + length > size_bytes) {
-      NTPC_PRINTF("EEPROM read addr out of bounds: addr=0x%04lX, length=%lu\n",
-                  mem_addr, length);
+      NTPC_VERBOSE("EEPROM read addr out of bounds: addr=0x%04lX, length=%lu\n",
+                   mem_addr, length);
       return result_t::ADDR_OUT_OF_BOUNDS;
     }
 
@@ -58,19 +58,19 @@ class Driver {
 
     int ret = i2c_write_blocking(i2c, dev_addr, addr_buf, 2, true);
     if (ret != 2) {
-      NTPC_PRINTF("EEPROM read i2c_write_blocking failed: ret=%d\n", ret);
+      NTPC_VERBOSE("EEPROM read i2c_write_blocking failed: ret=%d\n", ret);
       return result_t::I2C_ACCESS_FAILED;
     }
 
     ret = i2c_read_blocking(i2c, dev_addr, buffer, length, false);
     if (ret != (int)length) {
-      NTPC_PRINTF("EEPROM read i2c_read_blocking failed: ret=%d\n", ret);
+      NTPC_VERBOSE("EEPROM read i2c_read_blocking failed: ret=%d\n", ret);
       return result_t::I2C_ACCESS_FAILED;
     }
 
-    if (ntpc::stdio_inited) {
-      NTPC_PRINTF("EEPROM read successful: addr=0x%04lX, length=%lu\n",
-                  mem_addr, length);
+    if (ntpc::debug_mode) {
+      NTPC_VERBOSE("EEPROM read successful: addr=0x%04lX, length=%lu\n",
+                   mem_addr, length);
       for (addr_t i = 0; i < length; i++) {
         if (i % 16 == 0) {
           printf("\n0x%04lX: ", mem_addr + i);
@@ -88,8 +88,9 @@ class Driver {
     uint8_t* write_buf = new uint8_t[page_bytes];
     addr_t offset_mask = page_bytes - 1;
 
-    if (ntpc::stdio_inited) {
-      NTPC_PRINTF("EEPROM write: addr=0x%04lX, length=%lu\n", mem_addr, length);
+    if (ntpc::debug_mode) {
+      NTPC_VERBOSE("EEPROM write: addr=0x%04lX, length=%lu\n", mem_addr,
+                   length);
       for (addr_t i = 0; i < length; i++) {
         if (i % 16 == 0) {
           printf("\n0x%04lX: ", mem_addr + i);
@@ -100,8 +101,9 @@ class Driver {
     }
 
     if (mem_addr + length > size_bytes) {
-      NTPC_PRINTF("EEPROM write addr out of bounds: addr=0x%04lX, length=%lu\n",
-                  mem_addr, length);
+      NTPC_VERBOSE(
+          "EEPROM write addr out of bounds: addr=0x%04lX, length=%lu\n",
+          mem_addr, length);
       res = result_t::ADDR_OUT_OF_BOUNDS;
       goto failed;
     }
@@ -117,7 +119,7 @@ class Driver {
       int ret = i2c_write_blocking(i2c, dev_addr, write_buf, 2 + bytes_to_write,
                                    false);
       if (ret != (int)(2 + bytes_to_write)) {
-        NTPC_PRINTF("EEPROM write i2c_write_blocking failed: ret=%d\n", ret);
+        NTPC_VERBOSE("EEPROM write i2c_write_blocking failed: ret=%d\n", ret);
         res = result_t::I2C_ACCESS_FAILED;
         goto failed;
       }
