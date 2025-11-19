@@ -105,8 +105,11 @@ For more information about the configuration interface, see the [VLConfig](https
 
 ## Brightness Calibration
 
+The clock learns changes in the room's brightness to determine the display brightness. The maximum brightness is learned within one minute after startup, and the minimum brightness is learned over time.
+
+To calibrate your display brightness, follow these steps:
+
 1. Place the clock in the desired location.
 2. Turn on the power or press the reset switch.
-3. Turn the room lights on for 30 seconds, then off for 30 seconds.
-
-The clock will remember the difference in brightness and automatically adjust the display brightness from then on.
+3. Turn the room lights on for 30 seconds
+4. Turn the room lights off or shield the light sensor for 30 seconds.

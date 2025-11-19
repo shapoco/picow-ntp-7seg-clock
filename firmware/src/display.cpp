@@ -17,8 +17,8 @@ static constexpr int DIGIT_PORT_BASE = 0;
 static constexpr int SEGMENT_PORTS[] = {20, 21, 14, 16, 17, 19, 18, 15};
 static constexpr int SEGMENT_PORT_BASE = 14;
 
-static constexpr int COLON_COEFF = 128;
-static constexpr int HYPHEN_COEFF = 96;
+static constexpr int HYPHEN_COEFF = 255;
+static constexpr int COLON_COEFF = 255;
 
 static constexpr int NUM_DIGITS = 14;
 static constexpr int NUM_SEGMENTS = 8;
@@ -271,8 +271,8 @@ static void render_clock(uint64_t time_ms) {
 
   // コロンの点滅
   int alpha = get_blink_alpha(time_ms);
-  dram2[2 * NUM_SEGMENTS + 7] = 128 * alpha / 256;
-  dram2[4 * NUM_SEGMENTS + 7] = 128 * alpha / 256;
+  dram2[2 * NUM_SEGMENTS + 7] = COLON_COEFF * alpha / 256;
+  dram2[4 * NUM_SEGMENTS + 7] = COLON_COEFF * alpha / 256;
 }
 
 static int get_blink_alpha(uint64_t time_ms) {

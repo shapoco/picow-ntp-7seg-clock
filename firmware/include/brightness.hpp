@@ -8,8 +8,8 @@
 namespace ntpc::brightness {
 
 void init();
-uint16_t read_adc();
 void update(Context &ctx, uint64_t tick_ms);
+uint16_t read_adc();
 
 }  // namespace ntpc::brightness
 
